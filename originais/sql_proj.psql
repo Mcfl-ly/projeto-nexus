@@ -1,0 +1,43 @@
+CREATE TABLE users (
+ 	id SERIAL PRIMARY KEY,
+ 	email VARCHAR(50) NOT NULL UNIQUE,
+ 	password VARCHAR(200) NOT NULL,
+ 	name VARCHAR(100) NOT NULL,
+ 	created_at DATE
+ 	);
+
+CREATE TABLE refreshToken (
+ 	id SERIAL PRIMARY KEY,
+ 	user_id INT NOT NULL,
+ 	token VARCHAR(200) NOT NULL,
+ 	expires_at DATE,
+ 	revoked BOOL NULL,
+ 	created_at DATE,
+ 	FOREIGN KEY (user_id) REFERENCES users(id)
+ 	);
+
+CREATE TABLE userLibrary (
+	id SERIAL PRIMARY KEY,
+	user_id INT NOT NULL,
+	content_id VARCHAR(100) NOT NULL,
+	name VARCHAR(50),
+	status VARCHAR(20),
+	rating FLOAT,
+	created_at DATE,
+	FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+
+/*SCRIPT DE TESTE*/
+INSERT INTO users (email, password, name, created_at) VALUES
+('alice@email.com', 'senha_hash_123', 'Alice Silva', CURRENT_DATE),
+('bob@email.com', 'senha_hash_456', 'Bob Souza', CURRENT_DATE);
+
+INSERT INTO refreshToken (user_id, token, expires_at, revoked, created_at) VALUES
+(1, 'token_aleatorio_alice_999', CURRENT_DATE + INTERVAL '30 days', FALSE, CURRENT_DATE),
+(2, 'token_aleatorio_bob_888', CURRENT_DATE + INTERVAL '30 days', FALSE, CURRENT_DATE);
+
+INSERT INTO userLibrary (user_id, content_id, name, status, rating, created_at) VALUES
+(1, 'CONT-001', 'O Senhor dos Anéis', 'Lendo', 4.8, CURRENT_DATE),
+(1, 'CONT-002', 'Duna', 'Concluído', 5.0, CURRENT_DATE),
+(2, 'CONT-001', 'O Senhor dos Anéis', 'Quero Ler', NULL, CURRENT_DATE);
