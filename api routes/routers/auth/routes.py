@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, status, Response, Request
+from fastapi import FastAPI, HTTPException, status, Response, Request, APIRouter
 from pydantic import BaseModel, EmailStr, ValidationError, Field
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError, InvalidHashError
@@ -25,8 +25,8 @@ connection = psycopg2.connect(
 cursor = connection.cursor()
 
 pswdHasher = PasswordHasher()
-app = FastAPI()
 
+router = APIRouter(tags=["Auth"])
 
 
 # ----FUNÇÕES----
@@ -73,7 +73,7 @@ class Login(BaseModel):
 
 
 # ----ROTAS----
-@app.post("/register")
+@router.post("/register")
 async def register(dados: Register):
     hashed = pswdHasher.hash(dados.password)
     sql = "INSERT INTO users (email, password, name, created_at) VALUES (%s, %s, %s, %s)"
@@ -86,7 +86,7 @@ async def register(dados: Register):
         print("verification error")
 
 
-@app.post("/login")
+@router.post("/login")
 async def login(dados: Login, response: Response):
     token_sql = "INSERT INTO refreshtoken (user_id, token, expires_at, revoked, created_at) VALUES (%s, %s, %s, %s, %s)"
 
@@ -139,7 +139,7 @@ async def login(dados: Login, response: Response):
 
 
 
-@app.post("/logout")
+@router.post("/logout")
 async def logout(response: Response, request: Request):
     sql_update = "UPDATE refreshtoken SET revoked=true WHERE id = %s"
     sql_select = "SELECT id, token FROM refreshtoken WHERE revoked = false"
@@ -175,7 +175,7 @@ async def logout(response: Response, request: Request):
     return {"message": "Logout realizado com sucesso."}
 
 
-@app.post("/refresh")
+@router.post("/refresh")
 async def refresh(response: Response, request: Request):
     refresh_token = request.cookies.get("refresh_token")
     sql_check = "SELECT * FROM refreshtoken WHERE revoked = false"
