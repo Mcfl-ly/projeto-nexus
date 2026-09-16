@@ -4,15 +4,53 @@ import datetime
 import dotenv
 import os
 import jwt
-from sqlalchemy.testing.pickleable import User
 from pymongo import MongoClient
 import unicodedata
 import requests
 from pydantic import BaseModel
-from deep_translator import GoogleTranslator
-import re
 
 # ----CONEXÕES----
+GENRE_MAP = {
+    # Inglês
+    "fantasy": "Fantasia",
+    "science fiction": "Ficção científica",
+    "fiction": "Ficção",
+    "horror": "Terror",
+    "romance": "Romance",
+    "mystery": "Mistério",
+    "thriller": "Suspense",
+    "adventure": "Aventura",
+    "historical fiction": "Ficção histórica",
+    "historical": "Histórico",
+    "drama": "Drama",
+    "comedy": "Comédia",
+    "crime": "Crime",
+    "detective fiction": "Policial",
+    "biography": "Biografia",
+    "autobiography": "Autobiografia",
+    "poetry": "Poesia",
+    "philosophy": "Filosofia",
+    "religion": "Religião",
+    "history": "História",
+    "psychology": "Psicologia",
+
+    # Português
+    "fantasia": "Fantasia",
+    "ficção científica": "Ficção científica",
+    "ficção": "Ficção",
+    "terror": "Terror",
+    "romance": "Romance",
+    "mistério": "Mistério",
+    "suspense": "Suspense",
+    "aventura": "Aventura",
+    "drama": "Drama",
+    "comédia": "Comédia",
+    "crime": "Crime",
+    "poesia": "Poesia",
+    "biografia": "Biografia",
+    "autobiografia": "Autobiografia",
+    "história": "História",
+}
 connection_string = os.getenv("CONNECTION_STRING")
 
 dotenv.load_dotenv()
@@ -68,69 +106,6 @@ def normalize_text(text: str) -> str:
     )
     return text
 
-
-# def add_mongo():
-#     client = MongoClient(connection_string)
-#     db = client[os.getenv("DATABASE")]
-#     colecao = db[os.getenv("COLECAO")]
-#     dados = [
-#     {
-#         "title": "The Last Kingdom",
-#         "release_date": "2024-05-12",
-#         "summary": "Um RPG de ação em mundo aberto ambientado na era viking.",
-#         "image": "https://example.com",
-#         "genres": ["Action", "RPG", "Adventure"],
-#         "game_modes": ["Single-player", "Co-op"],
-#         "type": "Game"
-#     },
-#                         {
-#                             "title": "Space Velocity",
-#                             "release_date": "2025-11-20",
-#                             "summary": "Simulador de corrida espacial em alta velocidade com física realista.",
-#                             "image": "https://example.com",
-#                             "genres": ["Racing", "Simulation", "Sci-Fi"],
-#                             "game_modes": ["Single-player", "Multiplayer"],
-#                             "type": "Game"
-#                         },
-#     {
-#         "title": "Ecos do Amanhã",
-#         "release_date": "2023-08-15",
-#         "genres": ["Sci-Fi", "Drama", "Thriller"],
-#         "summary": "Um cientista descobre uma forma de receber mensagens do futuro, mas as consequências são catastróficas.",
-#         "image": "https://example.com",
-#         "type": "Movie"
-#     },
-#     {
-#         "title": "A Herança de Crimson",
-#         "release_date": "2026-02-05",
-#         "genres": ["Horror", "Mystery"],
-#         "summary": "Uma família herda uma mansão isolada e descobre segredos sombrios escondidos nas paredes.",
-#         "image": "https://example.com",
-#         "type": "Movie"
-#     },
-#     {
-#         "title": "O Império de Cinzas",
-#         "subtitle": "A Queda dos Três Reis",
-#         "authors": ["G. R. Martin", "J. R. R. Tolkien"],
-#         "release_date": "2021-03-30",
-#         "pages": 542,
-#         "image": "https://example.com",
-#         "type": "Book"
-#     },
-#     {
-#         "title": "Algoritmos do Pensamento",
-#         "subtitle": "Como a Inteligência Artificial Molda a Mente Humana",
-#         "authors": ["Ana Silva"],
-#         "release_date": "2025-09-01",
-#         "pages": 320,
-#         "image": "https://example.com",
-#         "type": "Book"
-#     }
-#     ]
-#     resultado = colecao.insert_many(dados)
-#     print(f"Documentos inseridos com sucesso! IDs: {resultado.inserted_ids}")
-#     client.close()
-#     return {"message": "Documentos inseridos com sucesso!"}
 def add_game_to_library(title, user):
     client = MongoClient(connection_string)
     db = client[os.getenv("DATABASE")]
@@ -193,7 +168,6 @@ def add_game_to_library(title, user):
         connection.commit()
         client.close()
         return "Jogo adicionado com sucesso."
-
 
 def add_movie_to_library(title, user):
     client = MongoClient(connection_string)
@@ -260,6 +234,69 @@ def add_movie_to_library(title, user):
         client.close()
         return "Filme adicionado com sucesso."
 
+def add_book_to_library(title, user):
+    client = MongoClient(connection_string)
+    db = client[os.getenv("DATABASE")]
+    colecao = db[os.getenv("COLECAO")]
+
+    insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
+    search_sql = "select * from userlibrary where user_id = %s and name = %s"
+    cursor.execute(search_sql, (int(user), title.title))
+    exist = cursor.fetchone()
+    if exist:
+        client.close()
+        return "livro já existe no seu catálogo."
+
+    # BUSCA DO MONGODB
+    id_externo = search_book_in_external_api(title.title)["external_id"]
+
+    livro = colecao.find_one({
+        "external_id": id_externo
+    })
+    if not livro:
+        dados = search_book_in_external_api(title.title)
+        if not dados:
+            client.close()
+            return "Livro não encontrado."
+
+        insert_data = colecao.insert_one(dados)
+        livro_name = dados["title"]
+        livro_id = dados["_id"]
+
+        cursor.execute(insert_sql,
+                       (
+                           int(user),
+                           str(livro_id),
+                           livro_name,
+                           "Quero Ler",
+                           None,
+                           datetime.date.today(),
+                           id_externo,
+                           title.type
+                       ))
+        connection.commit()
+
+    else:
+        print("bateu no else")
+        livro_id = livro["_id"]
+        livro_nome = livro["title"]
+        external_api_id = livro["external_id"]
+        print(external_api_id)
+        cursor.execute(insert_sql,
+                       (
+                           int(user),
+                           str(livro_id),
+                           livro_nome,
+                           "Quero Ler",
+                           None,
+                           datetime.date.today(),
+                           external_api_id,
+                           title.type
+                       ))
+        connection.commit()
+        client.close()
+        return "Livro adicionado com sucesso."
+
 def search_in_mongo(title, tipo):
     client = MongoClient(connection_string)
     db = client[os.getenv("DATABASE")]
@@ -270,7 +307,7 @@ def search_in_mongo(title, tipo):
         content = doc
     return content
 
-
+#FUNÇÃO EXCLUSIVA PARA A API IGDB DA TWITCH
 def get_igdb_token():
 
     global IGDB_TOKEN
@@ -296,34 +333,39 @@ fields name, first_release_date, genres.name, cover.image_id;
 search "{title}";
 limit 1;
 """
-    response = requests.post(
-        "https://api.igdb.com/v4/games",
-        headers={
-            "Client-ID": os.getenv("TWITCH_CLIENT_ID"),
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json"
-        },
-        data=query
-    )
-    if response.status_code == 200:
-        results = response.json()[0]
-        if results:
-            timestamp = results["first_release_date"]
-            date = str(datetime.datetime.fromtimestamp(timestamp)).split("T")[0].split(" ")[0]
-            try:
-                genres = [genre["name"] for genre in results["genres"]]
-            except:
-                genres = []
+    try:
+        response = requests.post(
+            "https://api.igdb.com/v4/games",
+            headers={
+                "Client-ID": os.getenv("TWITCH_CLIENT_ID"),
+                "Authorization": f"Bearer {access_token}",
+                "Accept": "application/json"
+            },
+            data=query
+        )
+        if response.status_code == 200:
+            results = response.json()[0]
+            if results:
+                timestamp = results["first_release_date"]
+                date = str(datetime.datetime.fromtimestamp(timestamp)).split("T")[0].split(" ")[0]
+                try:
+                    genres = [genre["name"] for genre in results["genres"]]
+                except:
+                    genres = []
 
-            image_url = f"https://images.igdb.com/igdb/image/upload/t_original/{results["cover"]["image_id"]}.jpg"
-            return {
-                "external_id": results["id"],
-                "title": normalize_text(results["name"]),
-                "release_date": date,
-                "genres": genres,
-                "image_url": image_url,
-                "type": "game"
-            }
+                image_url = f"https://images.igdb.com/igdb/image/upload/t_original/{results["cover"]["image_id"]}.jpg"
+                return {
+                    "external_id": results["id"],
+                    "title": normalize_text(results["name"]),
+                    "release_date": date,
+                    "genres": genres,
+                    "image_url": image_url,
+                    "type": "game"
+                }
+    except IndexError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
 
 def search_movie_in_external_api(title):
     tmdb_key = os.getenv("TMDB_KEY")
@@ -333,38 +375,87 @@ def search_movie_in_external_api(title):
               "query": main_title,
               "language": "pt-BR"
               }
-    response = requests.get(url, params=params)
+    try:
+        response = requests.get(url, params=params)
 
-    if response.status_code == 200:
-        results = response.json().get("results", [])
-        if results:
-            primeiro_filme = results[0]
+        if response.status_code == 200:
+            results = response.json().get("results", [])
+            if results:
+                primeiro_filme = results[0]
 
-            genres = [
-                TMDB_GENRES[genre_id]
-                for genre_id in primeiro_filme.get("genre_ids", [])
-                if genre_id in TMDB_GENRES
-            ]
+                genres = [
+                    TMDB_GENRES[genre_id]
+                    for genre_id in primeiro_filme.get("genre_ids", [])
+                    if genre_id in TMDB_GENRES
+                ]
 
-            poster_path = primeiro_filme.get("poster_path")
-            if poster_path:
-                poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}"
-            else:
-                poster_url = None
+                poster_path = primeiro_filme.get("poster_path")
+                if poster_path:
+                    poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}"
+                else:
+                    poster_url = None
 
+                return {
+                    "external_id": primeiro_filme["id"],
+                    "title": normalize_text(primeiro_filme["title"]),
+                    "original_title": normalize_text(primeiro_filme["original_title"]),
+                    "overview": primeiro_filme["overview"],
+                    "date": primeiro_filme["release_date"],
+                    "genres": genres,
+                    "poster": poster_url,
+                    "type": "movie"
+                }
+    except IndexError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+#FUNÇÃO EXCLUSIVA PARA A API OPEN LIBRARY
+def extract_genres(subjects):
+    genres = []
+
+    for subject in subjects:
+        subject_normalized = subject.strip().lower()
+
+        if subject_normalized in GENRE_MAP:
+            genre = GENRE_MAP[subject_normalized]
+
+            if genre not in genres:
+                genres.append(genre)
+
+    return genres
+
+def search_book_in_external_api(title):
+    url = "https://openlibrary.org/search.json"
+    normal_title = normalize_text(title)
+
+    params = {
+        "title": normalize_text(title),
+        "fields": "key,subject,title,author_name,first_publish_year,cover_i",
+        "limit": 1,
+        "lang": "pt"
+    }
+    try:
+        response = requests.get(url, params=params)
+
+        if response.status_code == 200:
+            results = response.json()["docs"][0]
+            subjects = results.get("subject", [])
+            genres = extract_genres(subjects)
+            image_url = f"https://covers.openlibrary.org/b/id/{results["cover_i"]}-L.jpg"
             return {
-                "external_id": primeiro_filme["id"],
-                "title": normalize_text(primeiro_filme["title"]),
-                "original_title": normalize_text(primeiro_filme["original_title"]),
-                "overview": primeiro_filme["overview"],
-                "date": primeiro_filme["release_date"],
+                "external_id": results["key"],
+                "title": normalize_text(results["title"]),
+                "author_name": results["author_name"],
+                "release_date": results["first_publish_year"],
                 "genres": genres,
-                "poster": poster_url,
-                "type": "movie"
-
+                "image_url": image_url,
+                "type": "book"
             }
-        else:
-            print("Nenhum filme encontrado.")
+    except IndexError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
 
 def get_current_user(request: Request):
     access_token = request.cookies.get("access_token")
@@ -419,7 +510,6 @@ async def get_library(user_id: str = Depends(get_current_user)):
 
     return cursor.fetchall()
 
-
 @router.post("/library")
 async def add_content(title: ContentRequest, user = Depends(get_current_user)):
     if title.type == "movie":
@@ -436,13 +526,10 @@ async def add_content(title: ContentRequest, user = Depends(get_current_user)):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
             )
-
-
-
-
-# @router.get("/teste")
-# async def teste_mongo():
-#
-#     return search_game_in_external_api("no mans sky")
-
-
+    elif title.type == "book":
+        try:
+            return add_book_to_library(title, user)
+        except psycopg2.errors.UniqueViolation:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+            )
