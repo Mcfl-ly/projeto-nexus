@@ -9,11 +9,14 @@ from pymongo import MongoClient
 import unicodedata
 import requests
 from pydantic import BaseModel
+from deep_translator import GoogleTranslator
+import re
+
 # ----CONEXÕES----
 connection_string = os.getenv("CONNECTION_STRING")
 
 dotenv.load_dotenv()
-
+IGDB_TOKEN = None
 secret_key = os.getenv("SECRET_KEY")
 algorithm = os.getenv("ALGORITHM")
 
@@ -128,20 +131,199 @@ def normalize_text(text: str) -> str:
 #     print(f"Documentos inseridos com sucesso! IDs: {resultado.inserted_ids}")
 #     client.close()
 #     return {"message": "Documentos inseridos com sucesso!"}
-
-
-
-def search_in_mongo(title, tipo):
-    normal_title = normalize_text(title)
+def add_game_to_library(title, user):
     client = MongoClient(connection_string)
     db = client[os.getenv("DATABASE")]
     colecao = db[os.getenv("COLECAO")]
-    filme = None
+
+    insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
+    search_sql = "select * from userlibrary where user_id = %s and name = %s"
+    cursor.execute(search_sql, (int(user), title.title))
+    exist = cursor.fetchone()
+    if exist:
+        client.close()
+        return "jogo já existe no seu catálogo."
+
+        # BUSCA DO MONGODB
+    id_externo = search_game_in_external_api(title.title)["external_id"]
+
+
+    game = colecao.find_one({
+        "external_id": id_externo
+    })
+    if not game:
+        dados = search_game_in_external_api(title.title)
+        if not dados:
+            client.close()
+            return "Jogo não encontrado."
+
+        insert_data = colecao.insert_one(dados)
+        game_name = dados["title"]
+        game_id = dados["_id"]
+
+        cursor.execute(insert_sql,
+                       (
+                           int(user),
+                           str(game_id),
+                           game_name,
+                           "Quero Jogar",
+                           None,
+                           datetime.date.today(),
+                           id_externo,
+                           title.type
+                       ))
+        connection.commit()
+    else:
+        print("bateu no else")
+        game_id = game["_id"]
+        game_nome = game["title"]
+        external_api_id = game["external_id"]
+        print(external_api_id)
+        cursor.execute(insert_sql,
+                        (
+                        int(user),
+                        str(game_id),
+                        game_nome,
+                        "Quero Jogar",
+                        None,
+                        datetime.date.today(),
+                        external_api_id,
+                        title.type
+                        ))
+        connection.commit()
+        client.close()
+        return "Jogo adicionado com sucesso."
+
+
+def add_movie_to_library(title, user):
+    client = MongoClient(connection_string)
+    db = client[os.getenv("DATABASE")]
+    colecao = db[os.getenv("COLECAO")]
+
+
+    insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
+    search_sql = "select * from userlibrary where user_id = %s and name = %s"
+    cursor.execute(search_sql, (int(user), title.title))
+    exist = cursor.fetchone()
+    if exist:
+        client.close()
+        return "filme já existe no seu catálogo."
+
+# BUSCA DO MONGODB
+    id_externo = search_movie_in_external_api(title.title)["external_id"]
+
+    filme = colecao.find_one({
+        "external_id": id_externo
+    })
+    if not filme:
+        dados = search_movie_in_external_api(title.title)
+        if not dados:
+            client.close()
+            return "Filme não encontrado."
+
+
+        insert_data = colecao.insert_one(dados)
+        filme_name = dados["title"]
+        filme_id = dados["_id"]
+
+        cursor.execute(insert_sql,
+                       (
+                           int(user),
+                           str(filme_id),
+                           filme_name,
+                           "Quero Assistir",
+                           None,
+                           datetime.date.today(),
+                           id_externo,
+                           title.type
+                       ))
+        connection.commit()
+
+    else:
+        print("bateu no else")
+        filme_id = filme["_id"]
+        filme_nome = filme["title"]
+        external_api_id = filme["external_id"]
+        print(external_api_id)
+        cursor.execute(insert_sql,
+                        (
+                        int(user),
+                        str(filme_id),
+                        filme_nome,
+                        "Quero Assistir",
+                        None,
+                        datetime.date.today(),
+                        external_api_id,
+                        title.type
+                        ))
+        connection.commit()
+        client.close()
+        return "Filme adicionado com sucesso."
+
+def search_in_mongo(title, tipo):
+    client = MongoClient(connection_string)
+    db = client[os.getenv("DATABASE")]
+    colecao = db[os.getenv("COLECAO")]
+    content = None
     results = colecao.find({"title": {"$regex": title}, "type": tipo})
     for doc in results:
-        filme = doc
-    return filme
+        content = doc
+    return content
 
+
+def get_igdb_token():
+
+    global IGDB_TOKEN
+
+    if IGDB_TOKEN:
+        return IGDB_TOKEN
+
+    url = "https://id.twitch.tv/oauth2/token"
+    data = {
+        "client_id": os.getenv("TWITCH_CLIENT_ID"),
+        "client_secret": os.getenv("TWITCH_CLIENT_SECRET"),
+        "grant_type": "client_credentials"
+    }
+    response = requests.post(url, data=data)
+    response.raise_for_status()
+    IGDB_TOKEN = response.json()["access_token"]
+    return IGDB_TOKEN
+
+def search_game_in_external_api(title):
+    access_token = get_igdb_token()
+    query = f"""
+fields name, first_release_date, genres.name, cover.image_id;
+search "{title}";
+limit 1;
+"""
+    response = requests.post(
+        "https://api.igdb.com/v4/games",
+        headers={
+            "Client-ID": os.getenv("TWITCH_CLIENT_ID"),
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json"
+        },
+        data=query
+    )
+    if response.status_code == 200:
+        results = response.json()[0]
+        if results:
+            timestamp = results["first_release_date"]
+            date = str(datetime.datetime.fromtimestamp(timestamp)).split("T")[0].split(" ")[0]
+            try:
+                genres = [genre["name"] for genre in results["genres"]]
+            except:
+                genres = []
+
+            image_url = f"https://images.igdb.com/igdb/image/upload/t_original/{results["cover"]["image_id"]}.jpg"
+            return {
+                "external_id": results["id"],
+                "title": normalize_text(results["name"]),
+                "release_date": date,
+                "genres": genres,
+                "image_url": image_url,
+                "type": "game"
+            }
 
 def search_movie_in_external_api(title):
     tmdb_key = os.getenv("TMDB_KEY")
@@ -237,72 +419,30 @@ async def get_library(user_id: str = Depends(get_current_user)):
 
     return cursor.fetchall()
 
+
 @router.post("/library")
-async def add_content_to_library(title: ContentRequest, user = Depends(get_current_user)):
-    client = MongoClient(connection_string)
-    db = client[os.getenv("DATABASE")]
-    colecao = db[os.getenv("COLECAO")]
+async def add_content(title: ContentRequest, user = Depends(get_current_user)):
+    if title.type == "movie":
+        try:
+            return add_movie_to_library(title, user)
+        except psycopg2.errors.UniqueViolation:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+            )
+    elif title.type == "game":
+        try:
+            return add_game_to_library(title, user)
+        except psycopg2.errors.UniqueViolation:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+            )
 
 
-    insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id) values (%s, %s, %s, %s, %s, %s, %s)"
-    search_sql = "select * from userlibrary where user_id = %s and name = %s"
-    cursor.execute(search_sql, (int(user), title.title))
-    exist = cursor.fetchone()
-    if exist:
-        client.close()
-        return "filme ja existe no seu catálogo."
-
-# BUSCA DO MONGODB
-    id_externo = search_movie_in_external_api(title.title)["external_id"]
-
-    filme = colecao.find_one({
-        "external_id": id_externo
-    })
-    if not filme:
-        dados = search_movie_in_external_api(title.title)
-        if not dados:
-            client.close()
-            return "Filme não encontrado."
 
 
-        insert_data = colecao.insert_one(dados)
-        filme_name = dados["title"]
-        filme_id = dados["external_id"]
-
-        cursor.execute(insert_sql,
-                       (
-                           int(user),
-                           str(filme_id),
-                           filme_name,
-                           "Quero Assistir",
-                           None,
-                           datetime.date.today(),
-                           id_externo
-                       ))
-        connection.commit()
-
-    else:
-        print("bateu no else")
-        filme_id = filme["_id"]
-        filme_nome = filme["title"]
-        external_api_id = filme["external_id"]
-        print(external_api_id)
-        cursor.execute(insert_sql,
-                        (
-                        int(user),
-                        str(filme_id),
-                        filme_nome,
-                        "Quero Assistir",
-                        None,
-                        datetime.date.today(),
-                        external_api_id
-                        ))
-        connection.commit()
-        client.close()
-        return "Filme adicionado com sucesso."
 # @router.get("/teste")
 # async def teste_mongo():
 #
-#     return search_movie_in_external_api("de volta para o futuro")
+#     return search_game_in_external_api("no mans sky")
 
 
