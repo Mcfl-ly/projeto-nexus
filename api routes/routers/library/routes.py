@@ -1,3 +1,4 @@
+from deep_translator import GoogleTranslator
 from fastapi import FastAPI, HTTPException, status, Response, Request, APIRouter, Depends
 import psycopg2
 import datetime
@@ -8,6 +9,19 @@ from pymongo import MongoClient
 import unicodedata
 import requests
 from pydantic import BaseModel
+import argostranslate.package
+import argostranslate.translate
+
+argostranslate.package.update_package_index()
+
+packages = argostranslate.package.get_available_packages()
+
+package = next(
+    p for p in packages
+    if p.from_code == "pt" and p.to_code == "en"
+)
+
+argostranslate.package.install_from_path(package.download())
 
 # ----CONEXÕES----
 GENRE_MAP = {
@@ -74,6 +88,19 @@ class ContentRequest(BaseModel):
     title: str
     type: str
 
+class LibraryUpdate(BaseModel):
+    status: str | None = None
+    rating: int | None = None
+
+class ManualContent(BaseModel):
+    title: str
+    type: str
+    author: list | None = None
+    release_date: str | None = None
+    genres: list | None = None
+    img_url: str | None = None
+
+
 TMDB_GENRES = {
     28: "Ação",
     12: "Aventura",
@@ -112,8 +139,8 @@ def add_game_to_library(title, user):
     colecao = db[os.getenv("COLECAO")]
 
     insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
-    search_sql = "select * from userlibrary where user_id = %s and name = %s"
-    cursor.execute(search_sql, (int(user), title.title))
+    search_sql = "select * from userlibrary where user_id = %s and name = %s and content_type = %s"
+    cursor.execute(search_sql, (int(user), title.title, title.type))
     exist = cursor.fetchone()
     if exist:
         client.close()
@@ -176,13 +203,13 @@ def add_movie_to_library(title, user):
 
 
     insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
-    search_sql = "select * from userlibrary where user_id = %s and name = %s"
-    cursor.execute(search_sql, (int(user), title.title))
+    search_sql = "select * from userlibrary where user_id = %s and name = %s and content_type = %s"
+    cursor.execute(search_sql, (int(user), title.title, title.type))
     exist = cursor.fetchone()
     if exist:
+        print("existe")
         client.close()
         return "filme já existe no seu catálogo."
-
 # BUSCA DO MONGODB
     id_externo = search_movie_in_external_api(title.title)["external_id"]
 
@@ -190,6 +217,7 @@ def add_movie_to_library(title, user):
         "external_id": id_externo
     })
     if not filme:
+        print("chegou no nao existe")
         dados = search_movie_in_external_api(title.title)
         if not dados:
             client.close()
@@ -240,8 +268,8 @@ def add_book_to_library(title, user):
     colecao = db[os.getenv("COLECAO")]
 
     insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
-    search_sql = "select * from userlibrary where user_id = %s and name = %s"
-    cursor.execute(search_sql, (int(user), title.title))
+    search_sql = "select * from userlibrary where user_id = %s and name = %s and content_type = %s"
+    cursor.execute(search_sql, (int(user), title.title, title.type))
     exist = cursor.fetchone()
     if exist:
         client.close()
@@ -425,19 +453,40 @@ def extract_genres(subjects):
 
     return genres
 
+def translate_title(title):
+    return argostranslate.translate.translate(
+        title,
+        "pt",
+        "en"
+    )
+
 def search_book_in_external_api(title):
+    global response
     url = "https://openlibrary.org/search.json"
     normal_title = normalize_text(title)
-
+    texto_traduzido = translate_title(normal_title)
     params = {
-        "title": normalize_text(title),
+        "title": normal_title,
         "fields": "key,subject,title,author_name,first_publish_year,cover_i",
         "limit": 1,
         "lang": "pt"
     }
     try:
-        response = requests.get(url, params=params)
-
+        params = {
+            "title": normal_title,
+            "fields": "key,subject,title,author_name,first_publish_year,cover_i",
+            "limit": 1,
+            "lang": "pt"
+        }
+        try:
+            response = requests.get(url, params=params)
+        except:
+            params = {
+                "title": normalize_text(texto_traduzido),
+                "fields": "key,subject,title,author_name,first_publish_year,cover_i",
+                "limit": 1,
+                "lang": "pt"
+            }
         if response.status_code == 200:
             results = response.json()["docs"][0]
             subjects = results.get("subject", [])
@@ -456,6 +505,8 @@ def search_book_in_external_api(title):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
         )
+
+
 
 def get_current_user(request: Request):
     access_token = request.cookies.get("access_token")
@@ -500,6 +551,104 @@ def get_current_user(request: Request):
         )
     return user_id
 
+
+    # title: str
+    # type: str
+    # author: list | None = None
+    # release_date: str | None = None
+    # genres: list | None = None
+    # img_url: str | None = None
+
+def add_manual_movie_to_library(dados, user):
+    client = MongoClient(connection_string)
+    db = client[os.getenv("DATABASE")]
+    colecao = db[os.getenv("COLECAO")]
+
+    data_to_insert = {
+        "title": dados.title,
+        "author": dados.author,
+        "release_date": dados.release_date,
+        "genres": dados.genres,
+        "img_url": dados.img_url,
+        "type": dados.type,
+    }
+    colecao.insert_one(data_to_insert)
+    movie = colecao.find_one({"title": dados.title})
+    print(movie)
+    insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
+
+    cursor.execute(insert_sql, (
+        user,
+        str(movie["_id"]),
+        movie["title"],
+        "Quero Assistir",
+        None,
+        datetime.date.today(),
+        None,
+        "movie"
+
+    ))
+    connection.commit()
+
+def add_manual_game_to_library(dados, user):
+    client = MongoClient(connection_string)
+    db = client[os.getenv("DATABASE")]
+    colecao = db[os.getenv("COLECAO")]
+
+    data_to_insert = {
+        "title": dados.title,
+        "release_date": dados.release_date,
+        "genres": dados.genres,
+        "img_url": dados.img_url,
+        "type": dados.type,
+    }
+    colecao.insert_one(data_to_insert)
+    game = colecao.find_one({"title": dados.title})
+    insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
+
+    cursor.execute(insert_sql, (
+        user,
+        str(game["_id"]),
+        game["title"],
+        "Quero Jogar",
+        None,
+        datetime.date.today(),
+        None,
+        "game"
+
+    ))
+    connection.commit()
+
+def add_manual_book_to_library(dados, user):
+    client = MongoClient(connection_string)
+    db = client[os.getenv("DATABASE")]
+    colecao = db[os.getenv("COLECAO")]
+
+    data_to_insert = {
+        "title": dados.title,
+        "author": dados.author,
+        "release_date": dados.release_date,
+        "genres": dados.genres,
+        "img_url": dados.img_url,
+        "type": dados.type,
+    }
+    colecao.insert_one(data_to_insert)
+    book = colecao.find_one({"title": dados.title})
+
+    insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
+
+    cursor.execute(insert_sql, (
+        user,
+        str(book["_id"]),
+        book["title"],
+        "Quero Ler",
+        None,
+        datetime.date.today(),
+        None,
+        "book"
+
+    ))
+    connection.commit()
 # ----ROTAS----
 @router.get("/library")
 async def get_library(user_id: str = Depends(get_current_user)):
@@ -533,3 +682,86 @@ async def add_content(title: ContentRequest, user = Depends(get_current_user)):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
             )
+
+@router.patch("/library/{id}")
+async def update_library(
+    id: int,
+    data: LibraryUpdate,
+    user_id: str = Depends(get_current_user)):
+    cursor.execute(
+        """
+        SELECT status, rating
+        FROM userlibrary
+        WHERE user_id = %s
+        AND id = %s
+        """,
+        (user_id, id)
+    )
+    library = cursor.fetchone()
+    if library is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Conteúdo não encontrado"
+    )
+    current_status, current_rating = library
+
+    new_status = (
+        data.status
+        if data.status is not None
+        else current_status
+    )
+    new_rating = (
+        data.rating
+        if data.rating is not None
+        else current_rating
+    )
+    cursor.execute(
+        """
+        UPDATE userlibrary
+        SET status = %s,
+            rating = %s
+        WHERE user_id = %s
+        AND id = %s
+        """,
+        (
+            new_status,
+            new_rating,
+            user_id,
+            id
+        )
+    )
+    connection.commit()
+    return {
+        "status": new_status,
+        "rating": new_rating,
+    }
+
+@router.delete("/library/{id}")
+async def delete_library(
+        id: int,
+        user_id: str = Depends(get_current_user)
+):
+    cursor.execute(
+        """
+                DELETE
+                FROM userlibrary
+                WHERE user_id = %s
+                AND id = %s
+                """,
+        (user_id, id)
+    )
+    connection.commit()
+
+# @router.get("/teste")
+# async def teste():
+#     return
+
+@router.post("/library/manual")
+async def add_manual_content(dados: ManualContent, user = Depends(get_current_user)):
+    # print(dados)
+    if dados.type == "movie":
+        return add_manual_movie_to_library(dados, user)
+    elif dados.type == "game":
+        return add_manual_game_to_library(dados, user)
+    else:
+        return add_manual_book_to_library(dados, user)
