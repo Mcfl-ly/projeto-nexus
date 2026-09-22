@@ -506,8 +506,6 @@ def search_book_in_external_api(title):
             status_code=status.HTTP_404_NOT_FOUND,
         )
 
-
-
 def get_current_user(request: Request):
     access_token = request.cookies.get("access_token")
 
@@ -751,10 +749,6 @@ async def delete_library(
         (user_id, id)
     )
     connection.commit()
-
-# @router.get("/teste")
-# async def teste():
-#     return
 
 @router.post("/library/manual")
 async def add_manual_content(dados: ManualContent, user = Depends(get_current_user)):
