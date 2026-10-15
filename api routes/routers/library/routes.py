@@ -1,3 +1,6 @@
+from typing import Literal
+import json
+from routers.db_errors import handle_database_errors
 from deep_translator import GoogleTranslator
 from fastapi import FastAPI, HTTPException, status, Response, Request, APIRouter, Depends
 import psycopg2
@@ -8,21 +11,7 @@ import jwt
 from pymongo import MongoClient
 import unicodedata
 import requests
-from pydantic import BaseModel
-import argostranslate.package
-import argostranslate.translate
-
-argostranslate.package.update_package_index()
-
-packages = argostranslate.package.get_available_packages()
-
-package = next(
-    p for p in packages
-    if p.from_code == "pt" and p.to_code == "en"
-)
-
-argostranslate.package.install_from_path(package.download())
-
+from pydantic import BaseModel, Field
 # ----CONEXÕES----
 GENRE_MAP = {
     # Inglês
@@ -65,9 +54,8 @@ GENRE_MAP = {
     "autobiografia": "Autobiografia",
     "história": "História",
 }
-connection_string = os.getenv("CONNECTION_STRING")
-
 dotenv.load_dotenv()
+connection_string = os.getenv("CONNECTION_STRING")
 IGDB_TOKEN = None
 secret_key = os.getenv("SECRET_KEY")
 algorithm = os.getenv("ALGORITHM")
@@ -85,16 +73,16 @@ cursor = connection.cursor()
 router = APIRouter(tags=["Libr"])
 
 class ContentRequest(BaseModel):
-    title: str
-    type: str
+    title: str = Field(min_length=1, max_length=500)
+    type: Literal["movie", "game", "book"]
 
 class LibraryUpdate(BaseModel):
     status: str | None = None
     rating: int | None = None
 
 class ManualContent(BaseModel):
-    title: str
-    type: str
+    title: str = Field(min_length=1, max_length=500)
+    type: Literal["movie", "game", "book"]
     author: list | None = None
     release_date: str | None = None
     genres: list | None = None
@@ -133,310 +121,132 @@ def normalize_text(text: str) -> str:
     )
     return text
 
+def _add_catalog_content(title, user, search, label, initial_status):
+    cursor.execute(
+        "SELECT id FROM userlibrary WHERE user_id = %s AND name = %s AND content_type = %s",
+        (int(user), title.title, title.type),
+    )
+    if cursor.fetchone():
+        return f"{label.lower()} já existe no seu catálogo."
+    dados = search(title.title)
+    if not dados:
+        raise HTTPException(status_code=404, detail=f"{label} não encontrado.")
+    client = MongoClient(connection_string, serverSelectionTimeoutMS=5000)
+    try:
+        collection = client[os.getenv("DATABASE")][os.getenv("COLECAO")]
+        # IDs numericos podem coincidir entre provedores diferentes.
+        content = collection.find_one({"external_id": dados["external_id"], "type": title.type})
+        if content is None:
+            result = collection.insert_one(dados)
+            content = dados
+            content.setdefault("_id", result.inserted_id)
+        cursor.execute(
+            "INSERT INTO userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            (int(user), str(content["_id"]), content["title"], initial_status, None,
+             datetime.date.today(), str(dados["external_id"]), title.type),
+        )
+        connection.commit()
+        return f"{label} adicionado com sucesso."
+    finally:
+        client.close()
+
+
+def _external_json(request, url, **kwargs):
+    try:
+        response = request(url, timeout=(3.05, 10), **kwargs)
+        if response.status_code != 200:
+            raise HTTPException(status_code=502, detail="Serviço externo indisponível.")
+        return response.json()
+    except requests.Timeout:
+        raise HTTPException(status_code=504, detail="Tempo limite do serviço externo excedido.") from None
+    except (requests.RequestException, ValueError):
+        raise HTTPException(status_code=502, detail="Resposta inválida do serviço externo.") from None
+
+
 def add_game_to_library(title, user):
-    client = MongoClient(connection_string)
-    db = client[os.getenv("DATABASE")]
-    colecao = db[os.getenv("COLECAO")]
-
-    insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
-    search_sql = "select * from userlibrary where user_id = %s and name = %s and content_type = %s"
-    cursor.execute(search_sql, (int(user), title.title, title.type))
-    exist = cursor.fetchone()
-    if exist:
-        client.close()
-        return "jogo já existe no seu catálogo."
-
-        # BUSCA DO MONGODB
-    id_externo = search_game_in_external_api(title.title)["external_id"]
-
-
-    game = colecao.find_one({
-        "external_id": id_externo
-    })
-    if not game:
-        dados = search_game_in_external_api(title.title)
-        if not dados:
-            client.close()
-            return "Jogo não encontrado."
-
-        insert_data = colecao.insert_one(dados)
-        game_name = dados["title"]
-        game_id = dados["_id"]
-
-        cursor.execute(insert_sql,
-                       (
-                           int(user),
-                           str(game_id),
-                           game_name,
-                           "Quero Jogar",
-                           None,
-                           datetime.date.today(),
-                           id_externo,
-                           title.type
-                       ))
-        connection.commit()
-    else:
-        print("bateu no else")
-        game_id = game["_id"]
-        game_nome = game["title"]
-        external_api_id = game["external_id"]
-        print(external_api_id)
-        cursor.execute(insert_sql,
-                        (
-                        int(user),
-                        str(game_id),
-                        game_nome,
-                        "Quero Jogar",
-                        None,
-                        datetime.date.today(),
-                        external_api_id,
-                        title.type
-                        ))
-        connection.commit()
-        client.close()
-        return "Jogo adicionado com sucesso."
+    return _add_catalog_content(title, user, search_game_in_external_api, "Jogo", "Quero Jogar")
 
 def add_movie_to_library(title, user):
-    client = MongoClient(connection_string)
-    db = client[os.getenv("DATABASE")]
-    colecao = db[os.getenv("COLECAO")]
-
-
-    insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
-    search_sql = "select * from userlibrary where user_id = %s and name = %s and content_type = %s"
-    cursor.execute(search_sql, (int(user), title.title, title.type))
-    exist = cursor.fetchone()
-    if exist:
-        print("existe")
-        client.close()
-        return "filme já existe no seu catálogo."
-# BUSCA DO MONGODB
-    id_externo = search_movie_in_external_api(title.title)["external_id"]
-
-    filme = colecao.find_one({
-        "external_id": id_externo
-    })
-    if not filme:
-        print("chegou no nao existe")
-        dados = search_movie_in_external_api(title.title)
-        if not dados:
-            client.close()
-            return "Filme não encontrado."
-
-
-        insert_data = colecao.insert_one(dados)
-        filme_name = dados["title"]
-        filme_id = dados["_id"]
-
-        cursor.execute(insert_sql,
-                       (
-                           int(user),
-                           str(filme_id),
-                           filme_name,
-                           "Quero Assistir",
-                           None,
-                           datetime.date.today(),
-                           id_externo,
-                           title.type
-                       ))
-        connection.commit()
-
-    else:
-        print("bateu no else")
-        filme_id = filme["_id"]
-        filme_nome = filme["title"]
-        external_api_id = filme["external_id"]
-        print(external_api_id)
-        cursor.execute(insert_sql,
-                        (
-                        int(user),
-                        str(filme_id),
-                        filme_nome,
-                        "Quero Assistir",
-                        None,
-                        datetime.date.today(),
-                        external_api_id,
-                        title.type
-                        ))
-        connection.commit()
-        client.close()
-        return "Filme adicionado com sucesso."
+    return _add_catalog_content(title, user, search_movie_in_external_api, "Filme", "Quero Assistir")
 
 def add_book_to_library(title, user):
-    client = MongoClient(connection_string)
-    db = client[os.getenv("DATABASE")]
-    colecao = db[os.getenv("COLECAO")]
-
-    insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
-    search_sql = "select * from userlibrary where user_id = %s and name = %s and content_type = %s"
-    cursor.execute(search_sql, (int(user), title.title, title.type))
-    exist = cursor.fetchone()
-    if exist:
-        client.close()
-        return "livro já existe no seu catálogo."
-
-    # BUSCA DO MONGODB
-    id_externo = search_book_in_external_api(title.title)["external_id"]
-
-    livro = colecao.find_one({
-        "external_id": id_externo
-    })
-    if not livro:
-        dados = search_book_in_external_api(title.title)
-        if not dados:
-            client.close()
-            return "Livro não encontrado."
-
-        insert_data = colecao.insert_one(dados)
-        livro_name = dados["title"]
-        livro_id = dados["_id"]
-
-        cursor.execute(insert_sql,
-                       (
-                           int(user),
-                           str(livro_id),
-                           livro_name,
-                           "Quero Ler",
-                           None,
-                           datetime.date.today(),
-                           id_externo,
-                           title.type
-                       ))
-        connection.commit()
-
-    else:
-        print("bateu no else")
-        livro_id = livro["_id"]
-        livro_nome = livro["title"]
-        external_api_id = livro["external_id"]
-        print(external_api_id)
-        cursor.execute(insert_sql,
-                       (
-                           int(user),
-                           str(livro_id),
-                           livro_nome,
-                           "Quero Ler",
-                           None,
-                           datetime.date.today(),
-                           external_api_id,
-                           title.type
-                       ))
-        connection.commit()
-        client.close()
-        return "Livro adicionado com sucesso."
+    return _add_catalog_content(title, user, search_book_in_external_api, "Livro", "Quero Ler")
 
 def search_in_mongo(title, tipo):
     client = MongoClient(connection_string)
-    db = client[os.getenv("DATABASE")]
-    colecao = db[os.getenv("COLECAO")]
-    content = None
-    results = colecao.find({"title": {"$regex": title}, "type": tipo})
-    for doc in results:
-        content = doc
-    return content
+    try:
+        db = client[os.getenv("DATABASE")]
+        colecao = db[os.getenv("COLECAO")]
+        content = None
+        results = colecao.find({"title": {"$regex": title}, "type": tipo})
+        for doc in results:
+            content = doc
+        return content
+    finally:
+        client.close()
 
 #FUNÇÃO EXCLUSIVA PARA A API IGDB DA TWITCH
 def get_igdb_token():
-
     global IGDB_TOKEN
-
     if IGDB_TOKEN:
         return IGDB_TOKEN
-
-    url = "https://id.twitch.tv/oauth2/token"
-    data = {
+    data = _external_json(requests.post, "https://id.twitch.tv/oauth2/token", data={
         "client_id": os.getenv("TWITCH_CLIENT_ID"),
         "client_secret": os.getenv("TWITCH_CLIENT_SECRET"),
-        "grant_type": "client_credentials"
-    }
-    response = requests.post(url, data=data)
-    response.raise_for_status()
-    IGDB_TOKEN = response.json()["access_token"]
+        "grant_type": "client_credentials",
+    })
+    if not isinstance(data, dict) or not isinstance(data.get("access_token"), str):
+        raise HTTPException(status_code=502, detail="Resposta inválida do serviço externo.")
+    IGDB_TOKEN = data["access_token"]
     return IGDB_TOKEN
 
 def search_game_in_external_api(title):
     access_token = get_igdb_token()
-    query = f"""
-fields name, first_release_date, genres.name, cover.image_id;
-search "{title}";
-limit 1;
-"""
+    query = ('fields name, first_release_date, genres.name, cover.image_id; '
+             f'search {json.dumps(title)}; limit 1;')
+    results = _external_json(requests.post, "https://api.igdb.com/v4/games", headers={
+        "Client-ID": os.getenv("TWITCH_CLIENT_ID"), "Authorization": f"Bearer {access_token}",
+        "Accept": "application/json",
+    }, data=query)
+    if not isinstance(results, list):
+        raise HTTPException(status_code=502, detail="Resposta inválida do serviço externo.")
+    if not results:
+        raise HTTPException(status_code=404, detail="Jogo não encontrado.")
     try:
-        response = requests.post(
-            "https://api.igdb.com/v4/games",
-            headers={
-                "Client-ID": os.getenv("TWITCH_CLIENT_ID"),
-                "Authorization": f"Bearer {access_token}",
-                "Accept": "application/json"
-            },
-            data=query
-        )
-        if response.status_code == 200:
-            results = response.json()[0]
-            if results:
-                timestamp = results["first_release_date"]
-                date = str(datetime.datetime.fromtimestamp(timestamp)).split("T")[0].split(" ")[0]
-                try:
-                    genres = [genre["name"] for genre in results["genres"]]
-                except:
-                    genres = []
-
-                image_url = f"https://images.igdb.com/igdb/image/upload/t_original/{results["cover"]["image_id"]}.jpg"
-                return {
-                    "external_id": results["id"],
-                    "title": normalize_text(results["name"]),
-                    "release_date": date,
-                    "genres": genres,
-                    "image_url": image_url,
-                    "type": "game"
-                }
-    except IndexError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
+        game = results[0]
+        timestamp = game.get("first_release_date")
+        release = datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc).date().isoformat() if timestamp is not None else None
+        cover = (game.get("cover") or {}).get("image_id")
+        return {
+            "external_id": game["id"], "title": normalize_text(game["name"]),
+            "release_date": release, "genres": [genre["name"] for genre in (game.get("genres") or [])],
+            "image_url": f"https://images.igdb.com/igdb/image/upload/t_original/{cover}.jpg" if cover else None,
+            "type": "game",
+        }
+    except (KeyError, TypeError, ValueError, AttributeError, OverflowError, OSError):
+        raise HTTPException(status_code=502, detail="Resposta inválida do serviço externo.") from None
 
 def search_movie_in_external_api(title):
-    tmdb_key = os.getenv("TMDB_KEY")
-    url = "https://api.themoviedb.org/3/search/movie"
-    main_title = normalize_text(title)
-    params = {"api_key": tmdb_key,
-              "query": main_title,
-              "language": "pt-BR"
-              }
+    data = _external_json(requests.get, "https://api.themoviedb.org/3/search/movie", params={
+        "api_key": os.getenv("TMDB_KEY"), "query": normalize_text(title), "language": "pt-BR",
+    })
+    if not isinstance(data, dict) or not isinstance(data.get("results"), list):
+        raise HTTPException(status_code=502, detail="Resposta inválida do serviço externo.")
+    if not data["results"]:
+        raise HTTPException(status_code=404, detail="Filme não encontrado.")
     try:
-        response = requests.get(url, params=params)
-
-        if response.status_code == 200:
-            results = response.json().get("results", [])
-            if results:
-                primeiro_filme = results[0]
-
-                genres = [
-                    TMDB_GENRES[genre_id]
-                    for genre_id in primeiro_filme.get("genre_ids", [])
-                    if genre_id in TMDB_GENRES
-                ]
-
-                poster_path = primeiro_filme.get("poster_path")
-                if poster_path:
-                    poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}"
-                else:
-                    poster_url = None
-
-                return {
-                    "external_id": primeiro_filme["id"],
-                    "title": normalize_text(primeiro_filme["title"]),
-                    "original_title": normalize_text(primeiro_filme["original_title"]),
-                    "overview": primeiro_filme["overview"],
-                    "date": primeiro_filme["release_date"],
-                    "genres": genres,
-                    "poster": poster_url,
-                    "type": "movie"
-                }
-    except IndexError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
+        movie = data["results"][0]
+        poster = movie.get("poster_path")
+        return {
+            "external_id": movie["id"], "title": normalize_text(movie["title"]),
+            "original_title": normalize_text(movie.get("original_title") or movie["title"]),
+            "overview": movie.get("overview", ""), "date": movie.get("release_date"),
+            "genres": [TMDB_GENRES[g] for g in (movie.get("genre_ids") or []) if g in TMDB_GENRES],
+            "poster": f"https://image.tmdb.org/t/p/w500{poster}" if poster else None,
+            "type": "movie",
+        }
+    except (KeyError, TypeError, AttributeError):
+        raise HTTPException(status_code=502, detail="Resposta inválida do serviço externo.") from None
 
 #FUNÇÃO EXCLUSIVA PARA A API OPEN LIBRARY
 def extract_genres(subjects):
@@ -454,57 +264,40 @@ def extract_genres(subjects):
     return genres
 
 def translate_title(title):
-    return argostranslate.translate.translate(
-        title,
-        "pt",
-        "en"
-    )
+    # Traducao e opcional. Modelos devem ser instalados fora da inicializacao
+    # da API; nunca baixar/instalar pacotes ao importar as rotas.
+    try:
+        import argostranslate.translate
+        return argostranslate.translate.translate(title, "pt", "en")
+    except Exception:
+        return title
 
 def search_book_in_external_api(title):
-    global response
-    url = "https://openlibrary.org/search.json"
     normal_title = normalize_text(title)
-    texto_traduzido = translate_title(normal_title)
-    params = {
-        "title": normal_title,
-        "fields": "key,subject,title,author_name,first_publish_year,cover_i",
-        "limit": 1,
-        "lang": "pt"
-    }
+    params = {"title": normal_title, "fields": "key,subject,title,author_name,first_publish_year,cover_i", "limit": 1, "lang": "pt"}
+    data = _external_json(requests.get, "https://openlibrary.org/search.json", params=params)
+    if not isinstance(data, dict) or not isinstance(data.get("docs"), list):
+        raise HTTPException(status_code=502, detail="Resposta inválida do serviço externo.")
+    if not data["docs"]:
+        translated = normalize_text(translate_title(normal_title))
+        if translated != normal_title:
+            data = _external_json(requests.get, "https://openlibrary.org/search.json", params={**params, "title": translated})
+        if not isinstance(data, dict) or not isinstance(data.get("docs"), list):
+            raise HTTPException(status_code=502, detail="Resposta inválida do serviço externo.")
+        if not data["docs"]:
+            raise HTTPException(status_code=404, detail="Livro não encontrado.")
     try:
-        params = {
-            "title": normal_title,
-            "fields": "key,subject,title,author_name,first_publish_year,cover_i",
-            "limit": 1,
-            "lang": "pt"
+        book = data["docs"][0]
+        cover = book.get("cover_i")
+        return {
+            "external_id": book["key"], "title": normalize_text(book["title"]),
+            "author_name": book.get("author_name") or [], "release_date": book.get("first_publish_year"),
+            "genres": extract_genres(book.get("subject") or []),
+            "image_url": f"https://covers.openlibrary.org/b/id/{cover}-L.jpg" if cover else None,
+            "type": "book",
         }
-        try:
-            response = requests.get(url, params=params)
-        except:
-            params = {
-                "title": normalize_text(texto_traduzido),
-                "fields": "key,subject,title,author_name,first_publish_year,cover_i",
-                "limit": 1,
-                "lang": "pt"
-            }
-        if response.status_code == 200:
-            results = response.json()["docs"][0]
-            subjects = results.get("subject", [])
-            genres = extract_genres(subjects)
-            image_url = f"https://covers.openlibrary.org/b/id/{results["cover_i"]}-L.jpg"
-            return {
-                "external_id": results["key"],
-                "title": normalize_text(results["title"]),
-                "author_name": results["author_name"],
-                "release_date": results["first_publish_year"],
-                "genres": genres,
-                "image_url": image_url,
-                "type": "book"
-            }
-    except IndexError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
+    except (KeyError, TypeError, AttributeError):
+        raise HTTPException(status_code=502, detail="Resposta inválida do serviço externo.") from None
 
 def get_current_user(request: Request):
     access_token = request.cookies.get("access_token")
@@ -559,96 +352,105 @@ def get_current_user(request: Request):
 
 def add_manual_movie_to_library(dados, user):
     client = MongoClient(connection_string)
-    db = client[os.getenv("DATABASE")]
-    colecao = db[os.getenv("COLECAO")]
-
-    data_to_insert = {
-        "title": dados.title,
-        "author": dados.author,
-        "release_date": dados.release_date,
-        "genres": dados.genres,
-        "img_url": dados.img_url,
-        "type": dados.type,
-    }
-    colecao.insert_one(data_to_insert)
-    movie = colecao.find_one({"title": dados.title})
-    print(movie)
-    insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
-
-    cursor.execute(insert_sql, (
-        user,
-        str(movie["_id"]),
-        movie["title"],
-        "Quero Assistir",
-        None,
-        datetime.date.today(),
-        None,
-        "movie"
-
-    ))
-    connection.commit()
+    try:
+        db = client[os.getenv("DATABASE")]
+        colecao = db[os.getenv("COLECAO")]
+    
+        data_to_insert = {
+            "title": dados.title,
+            "author": dados.author,
+            "release_date": dados.release_date,
+            "genres": dados.genres,
+            "img_url": dados.img_url,
+            "type": dados.type,
+        }
+        colecao.insert_one(data_to_insert)
+        movie = colecao.find_one({"title": dados.title})
+        insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
+    
+        cursor.execute(insert_sql, (
+            user,
+            str(movie["_id"]),
+            movie["title"],
+            "Quero Assistir",
+            None,
+            datetime.date.today(),
+            None,
+            "movie"
+    
+        ))
+        connection.commit()
+    finally:
+        client.close()
 
 def add_manual_game_to_library(dados, user):
     client = MongoClient(connection_string)
-    db = client[os.getenv("DATABASE")]
-    colecao = db[os.getenv("COLECAO")]
-
-    data_to_insert = {
-        "title": dados.title,
-        "release_date": dados.release_date,
-        "genres": dados.genres,
-        "img_url": dados.img_url,
-        "type": dados.type,
-    }
-    colecao.insert_one(data_to_insert)
-    game = colecao.find_one({"title": dados.title})
-    insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
-
-    cursor.execute(insert_sql, (
-        user,
-        str(game["_id"]),
-        game["title"],
-        "Quero Jogar",
-        None,
-        datetime.date.today(),
-        None,
-        "game"
-
-    ))
-    connection.commit()
+    try:
+        db = client[os.getenv("DATABASE")]
+        colecao = db[os.getenv("COLECAO")]
+    
+        data_to_insert = {
+            "title": dados.title,
+            "release_date": dados.release_date,
+            "genres": dados.genres,
+            "img_url": dados.img_url,
+            "type": dados.type,
+        }
+        colecao.insert_one(data_to_insert)
+        game = colecao.find_one({"title": dados.title})
+        insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
+    
+        cursor.execute(insert_sql, (
+            user,
+            str(game["_id"]),
+            game["title"],
+            "Quero Jogar",
+            None,
+            datetime.date.today(),
+            None,
+            "game"
+    
+        ))
+        connection.commit()
+    finally:
+        client.close()
 
 def add_manual_book_to_library(dados, user):
     client = MongoClient(connection_string)
-    db = client[os.getenv("DATABASE")]
-    colecao = db[os.getenv("COLECAO")]
-
-    data_to_insert = {
-        "title": dados.title,
-        "author": dados.author,
-        "release_date": dados.release_date,
-        "genres": dados.genres,
-        "img_url": dados.img_url,
-        "type": dados.type,
-    }
-    colecao.insert_one(data_to_insert)
-    book = colecao.find_one({"title": dados.title})
-
-    insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
-
-    cursor.execute(insert_sql, (
-        user,
-        str(book["_id"]),
-        book["title"],
-        "Quero Ler",
-        None,
-        datetime.date.today(),
-        None,
-        "book"
-
-    ))
-    connection.commit()
+    try:
+        db = client[os.getenv("DATABASE")]
+        colecao = db[os.getenv("COLECAO")]
+    
+        data_to_insert = {
+            "title": dados.title,
+            "author": dados.author,
+            "release_date": dados.release_date,
+            "genres": dados.genres,
+            "img_url": dados.img_url,
+            "type": dados.type,
+        }
+        colecao.insert_one(data_to_insert)
+        book = colecao.find_one({"title": dados.title})
+    
+        insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
+    
+        cursor.execute(insert_sql, (
+            user,
+            str(book["_id"]),
+            book["title"],
+            "Quero Ler",
+            None,
+            datetime.date.today(),
+            None,
+            "book"
+    
+        ))
+        connection.commit()
+    finally:
+        client.close()
 # ----ROTAS----
 @router.get("/library")
+@handle_database_errors(lambda: connection)
 async def get_library(user_id: str = Depends(get_current_user)):
 
     sql = "select * from userlibrary where user_id = %s"
@@ -658,30 +460,13 @@ async def get_library(user_id: str = Depends(get_current_user)):
     return cursor.fetchall()
 
 @router.post("/library")
+@handle_database_errors(lambda: connection)
 async def add_content(title: ContentRequest, user = Depends(get_current_user)):
-    if title.type == "movie":
-        try:
-            return add_movie_to_library(title, user)
-        except psycopg2.errors.UniqueViolation:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-            )
-    elif title.type == "game":
-        try:
-            return add_game_to_library(title, user)
-        except psycopg2.errors.UniqueViolation:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-            )
-    elif title.type == "book":
-        try:
-            return add_book_to_library(title, user)
-        except psycopg2.errors.UniqueViolation:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-            )
+    handlers = {"movie": add_movie_to_library, "game": add_game_to_library, "book": add_book_to_library}
+    return handlers[title.type](title, user)
 
 @router.patch("/library/{id}")
+@handle_database_errors(lambda: connection)
 async def update_library(
     id: int,
     data: LibraryUpdate,
@@ -735,6 +520,7 @@ async def update_library(
     }
 
 @router.delete("/library/{id}")
+@handle_database_errors(lambda: connection)
 async def delete_library(
         id: int,
         user_id: str = Depends(get_current_user)
@@ -751,6 +537,7 @@ async def delete_library(
     connection.commit()
 
 @router.post("/library/manual")
+@handle_database_errors(lambda: connection)
 async def add_manual_content(dados: ManualContent, user = Depends(get_current_user)):
     # print(dados)
     if dados.type == "movie":

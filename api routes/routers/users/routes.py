@@ -1,3 +1,4 @@
+from routers.db_errors import handle_database_errors
 from fastapi import FastAPI, HTTPException, status, Response, Request, APIRouter, Depends
 import psycopg2
 import datetime
@@ -20,7 +21,7 @@ class ContentRequest(BaseModel):
     type: str
 
 class UserUpdate(BaseModel):
-    username: str | None = None
+    username: str = Field(min_length=1, max_length=100)
 
 class PasswordUpdate(BaseModel):
     password: str = Field(min_length=8, max_length=64)
@@ -82,11 +83,14 @@ def get_current_user(request: Request):
 
 
 @router.get("/users/me")
+@handle_database_errors(lambda: connection)
 async def users_me(current_user = Depends(get_current_user)):
     user_sql = "SELECT * FROM users WHERE id = %s"
-    content_sql = "SELECT * FROM userlibrary WHERE user_id = %s"
+    content_sql = "SELECT id, user_id, content_id, name, status, rating, created_at, external_api_id, content_type FROM userlibrary WHERE user_id = %s"
     cursor.execute(user_sql, (current_user,))
     user = cursor.fetchone()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
     cursor.execute(content_sql, (current_user,))
     content = cursor.fetchall()
     final_content = []
@@ -98,7 +102,7 @@ async def users_me(current_user = Depends(get_current_user)):
                 "name": item[3],
                 "status": item[4],
                 "rating": item[5],
-                "type": item[7],
+                "type": item[8],
             }
         )
     returned_user = {
@@ -112,6 +116,7 @@ async def users_me(current_user = Depends(get_current_user)):
 
 #ALTERAR NOME DE USUÁRIO
 @router.patch("/users/me")
+@handle_database_errors(lambda: connection)
 async def update_username(data: UserUpdate, user_id: str = Depends(get_current_user)):
     cursor.execute(
         """
@@ -147,6 +152,7 @@ async def update_username(data: UserUpdate, user_id: str = Depends(get_current_u
 
 #ALTERAR SENHA
 @router.patch("/users/me/password")
+@handle_database_errors(lambda: connection)
 async def update_password(new_pswd: PasswordUpdate, user = Depends(get_current_user)):
     password = new_pswd.password
     hashed_pswd = pswdHasher.hash(password)
@@ -168,6 +174,7 @@ async def update_password(new_pswd: PasswordUpdate, user = Depends(get_current_u
     }
 
 @router.delete("/users/me/delete")
+@handle_database_errors(lambda: connection)
 async def delete_user(current_user = Depends(get_current_user)):
     sql_1 = "DELETE FROM refreshtoken WHERE user_id = %s"
     sql_2 = "DELETE FROM userlibrary WHERE user_id = %s"

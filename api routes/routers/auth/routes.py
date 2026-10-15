@@ -1,3 +1,5 @@
+from uuid import uuid4
+from routers.db_errors import handle_database_errors
 from fastapi import FastAPI, HTTPException, status, Response, Request, APIRouter
 from pydantic import BaseModel, EmailStr, ValidationError, Field
 from argon2 import PasswordHasher
@@ -51,6 +53,7 @@ def create_refresh_token(user_id):
     payload = {
         "exp": expires,
         "type": "refresh",
+        "jti": uuid4().hex,
         "sub": str(user_id)
     }
 
@@ -65,7 +68,7 @@ def create_refresh_token(user_id):
 class Register(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=64)
-    name: str
+    name: str = Field(min_length=1, max_length=100)
 
 class Login(BaseModel):
     email: EmailStr
@@ -74,19 +77,16 @@ class Login(BaseModel):
 
 # ----ROTAS----
 @router.post("/register")
+@handle_database_errors(lambda: connection)
 async def register(dados: Register):
     hashed = pswdHasher.hash(dados.password)
     sql = "INSERT INTO users (email, password, name, created_at) VALUES (%s, %s, %s, %s)"
-
-    try:
-        cursor.execute(sql, (dados.email, hashed, dados.name, datetime.date.today()))
-        connection.commit()
-
-    except VerifyMismatchError:
-        print("verification error")
+    cursor.execute(sql, (dados.email, hashed, dados.name, datetime.date.today()))
+    connection.commit()
 
 
 @router.post("/login")
+@handle_database_errors(lambda: connection)
 async def login(dados: Login, response: Response):
     token_sql = "INSERT INTO refreshtoken (user_id, token, expires_at, revoked, created_at) VALUES (%s, %s, %s, %s, %s)"
 
@@ -134,12 +134,13 @@ async def login(dados: Login, response: Response):
             "status": "sucesso",
             "mensagem": "Senha correta."
         }
-    except Exception:
+    except (VerifyMismatchError, InvalidHashError):
         raise erro_autenticacao
 
 
 
 @router.post("/logout")
+@handle_database_errors(lambda: connection)
 async def logout(response: Response, request: Request):
     sql_update = "UPDATE refreshtoken SET revoked=true WHERE id = %s"
     sql_select = "SELECT id, token FROM refreshtoken WHERE revoked = false"
@@ -149,16 +150,13 @@ async def logout(response: Response, request: Request):
     if refresh_token:
         for token in tokens:
             try:
-                print("iniciar aq")
                 if pswdHasher.verify(token[1], refresh_token):
                     cursor.execute(sql_update, (token[0],))
                     connection.commit()
                     break
             except VerifyMismatchError:
-                print("token incorreto")
                 continue
             except InvalidHashError:
-                print("hash incorreto")
                 continue
     response.delete_cookie(
         key="refresh_token",
@@ -176,8 +174,11 @@ async def logout(response: Response, request: Request):
 
 
 @router.post("/refresh")
+@handle_database_errors(lambda: connection)
 async def refresh(response: Response, request: Request):
     refresh_token = request.cookies.get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(status_code=401, detail="Refresh token inválido.")
     sql_check = "SELECT * FROM refreshtoken WHERE revoked = false"
     sql_rotate_token = "UPDATE refreshtoken SET revoked=true WHERE id = %s"
     sql_add_new_refresh_token = "INSERT INTO refreshtoken (user_id, token, expires_at, revoked, created_at) VALUES (%s, %s, %s, %s, %s)"
@@ -186,30 +187,26 @@ async def refresh(response: Response, request: Request):
     for token in tokens:
         try:
             valid = pswdHasher.verify(token[2], refresh_token)
-        except:
+        except (VerifyMismatchError, InvalidHashError, TypeError):
             continue
         if valid:
-            print("1 - refresh válido")
             if not datetime.date.today() >= token[3]:
-                print("2 - refresh não expirado")
 
                 created_at = datetime.datetime.now(datetime.timezone.utc)
                 expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)
-                print("3 - criando tokens")
 
                 new_access_token = create_access_token(token[1])
                 new_refresh_token = create_refresh_token(token[1])
-                print("NOVO REFRESH:", new_refresh_token)
 
                 hashed_new_refresh_token = pswdHasher.hash(new_refresh_token)
-                print("4 - hash criado")
 
-                cursor.execute(sql_rotate_token, (token[0],))
-                print("5 - token antigo revogado")
+                cursor.execute(sql_rotate_token + " AND revoked = false", (token[0],))
+                if cursor.rowcount == 0:
+                    connection.rollback()
+                    raise HTTPException(status_code=401, detail="Refresh token inválido.")
 
                 cursor.execute(sql_add_new_refresh_token, (token[1], hashed_new_refresh_token, expires_at, False, created_at))
                 connection.commit()
-                print("6 - novo refresh inserido")
 
                 response.set_cookie(
                     key="access_token",
@@ -227,7 +224,6 @@ async def refresh(response: Response, request: Request):
                     samesite="lax",
                     max_age=60 * 60 * 24 * 30
                 )
-                print("7 - cookies atualizados")
                 return {"message": "Access token renovado"}
 
 
