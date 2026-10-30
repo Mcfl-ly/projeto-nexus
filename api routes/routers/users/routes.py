@@ -106,6 +106,7 @@ async def users_me(current_user = Depends(get_current_user)):
             }
         )
     returned_user = {
+        "id" : user[0],
         "email": user[1],
         "username": user[3],
         "created_at": user[4],

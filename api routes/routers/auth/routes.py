@@ -117,7 +117,7 @@ async def login(dados: Login, response: Response):
             key="access_token",
             value=access_token,
             httponly=True,
-            secure=True,
+            secure=False,
             samesite="lax",
             max_age=60 * 15
         )
@@ -126,7 +126,7 @@ async def login(dados: Login, response: Response):
             key="refresh_token",
             value=refresh_token,
             httponly=True,
-            secure=True,
+            secure=False,
             samesite="lax",
             max_age=60 * 60 * 24 * 30
         )
@@ -212,7 +212,7 @@ async def refresh(response: Response, request: Request):
                     key="access_token",
                     value=new_access_token,
                     httponly=True,
-                    secure=True,
+                    secure=False,
                     samesite="lax",
                     max_age=60 * 15
                 )
@@ -220,7 +220,7 @@ async def refresh(response: Response, request: Request):
                     key="refresh_token",
                     value=new_refresh_token,
                     httponly=True,
-                    secure=True,
+                    secure=False,
                     samesite="lax",
                     max_age=60 * 60 * 24 * 30
                 )
