@@ -1,0 +1,209 @@
+.register-page,
+.register-page * {
+    box-sizing: border-box;
+}
+
+.register-page {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: grid;
+    place-items: center;
+    padding: 32px 20px;
+    background:
+            radial-gradient(
+                    circle at 15% 15%,
+                    #ede1ff 0,
+                    transparent 40%
+            ),
+            radial-gradient(
+                    circle at 85% 85%,
+                    #e0f2ff 0,
+                    transparent 40%
+            ),
+            #faf9f7;
+    color: #10213a;
+    font-family: inherit;
+}
+
+.register-card {
+    width: 100%;
+    max-width: 440px;
+    padding: 36px;
+    border: 1px solid #e9e9ee;
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 16px 48px rgb(16 33 58 / 6%);
+}
+
+.register-brand {
+    margin-bottom: 28px;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -1px;
+}
+
+/* Apresentação */
+
+.register-heading {
+    margin-bottom: 28px;
+}
+
+.register-icon {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 18px;
+    border-radius: 14px;
+    background: #f3e8ff;
+    font-size: 24px;
+}
+
+.register-heading h1 {
+    margin: 0 0 10px;
+    font-size: 30px;
+    line-height: 1.15;
+    font-weight: 800;
+    letter-spacing: -0.8px;
+}
+
+.register-heading p {
+    margin: 0;
+    color: #64748b;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* Formulário */
+
+.register-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.register-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.register-field label {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.register-field input {
+    width: 100%;
+    min-height: 46px;
+    padding: 12px 14px;
+    border: 1px solid #dfe3e9;
+    border-radius: 10px;
+    background: #fcfcfd;
+    color: #10213a;
+    font: inherit;
+    font-size: 14px;
+}
+
+.register-field input::placeholder {
+    color: #788597;
+}
+
+.register-field input:focus-visible {
+    border-color: #9333ea;
+    outline: 3px solid #f3e8ff;
+    outline-offset: 1px;
+}
+
+.register-field input[aria-invalid="true"] {
+    border-color: #dc2626;
+}
+
+.register-submit {
+    min-height: 46px;
+    margin-top: 4px;
+    padding: 12px 18px;
+    border: none;
+    border-radius: 10px;
+    background: #9333ea;
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.register-submit:hover {
+    background: #7e22ce;
+}
+
+.register-submit:focus-visible,
+.register-login a:focus-visible {
+    outline: 3px solid #9333ea;
+    outline-offset: 3px;
+}
+
+.register-error {
+    margin: 0;
+    color: #b91c1c;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.register-message {
+    margin: 0;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.register-message:empty {
+    display: none;
+}
+
+/* Link para login */
+
+.register-login {
+    margin: 24px 0 0;
+    color: #64748b;
+    text-align: center;
+    font-size: 14px;
+}
+
+.register-login a {
+    border-radius: 3px;
+    color: #9333ea;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.register-login a:hover {
+    text-decoration: underline;
+}
+
+/* Rodapé */
+
+.register-footer {
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid #eeeef2;
+    color: #64748b;
+    text-align: center;
+    font-size: 12px;
+}
+
+/* Celular */
+
+@media (max-width: 480px) {
+    .register-page {
+        padding: 20px 16px;
+    }
+
+    .register-card {
+        padding: 28px 22px;
+    }
+
+    .register-heading h1 {
+        font-size: 27px;
+    }
+}

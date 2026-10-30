@@ -1,0 +1,263 @@
+/* Movies.css */
+
+.movies-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 24px 48px;
+    color: #10213a;
+}
+
+/* Título e botão */
+
+.movies-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 28px;
+}
+
+.movies-heading h1 {
+    margin: 0 0 6px;
+    font-size: 32px;
+    font-weight: 800;
+}
+
+.movies-heading p {
+    margin: 0;
+    color: #64748b;
+    font-size: 15px;
+}
+
+.add-movie-button {
+    border: none;
+    border-radius: 10px;
+    padding: 12px 18px;
+    background: #9333ea;
+    color: white;
+    font: inherit;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.add-movie-button:hover {
+    background: #7e22ce;
+}
+
+/* Colunas */
+
+.movies-columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+}
+
+.movie-column {
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid #e9e9ee;
+    border-radius: 16px;
+    background: #fff;
+}
+
+.column-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 2px 14px;
+}
+
+.column-header h2 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    font-size: 17px;
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    border-radius: 50%;
+}
+
+.status-pending {
+    background: #ff4d57;
+}
+
+.status-watched {
+    background: #00bf75;
+}
+
+.movie-count {
+    display: grid;
+    place-items: center;
+    min-width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #f0f1f3;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* Cards */
+
+.movie-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.movie-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 10px;
+    border: 1px solid #eeeeF2;
+    border-radius: 12px;
+    background: #fff;
+}
+
+.movie-poster {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 90px;
+    height: 120px;
+    overflow: hidden;
+    border-radius: 7px;
+    background: #f0eafa;
+    color: #76559a;
+    text-align: center;
+    font-size: 12px;
+}
+
+/* Funciona se a capa for um <img> ou estiver dentro de uma div. */
+img.movie-poster,
+.movie-poster img {
+    display: block;
+    width: 90px;
+    height: 120px;
+    object-fit: cover;
+}
+
+.movie-info {
+    flex: 1;
+    min-width: 0;
+    padding-top: 6px;
+}
+
+.movie-info h3 {
+    margin: 0 0 6px;
+    font-size: 16px;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.movie-year {
+    margin: 0 0 10px;
+    color: #64748b;
+    font-size: 13px;
+}
+
+/* Gêneros */
+
+.movie-genres {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.movie-genres li {
+    padding: 4px 8px;
+    border-radius: 20px;
+    background: #f1f2f4;
+    color: #526177;
+    font-size: 11px;
+}
+
+/* Favoritos e opções */
+
+.movie-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.movie-actions button {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #64748b;
+    font-size: 23px;
+    cursor: pointer;
+}
+
+.movie-actions button:hover {
+    background: #f5f0fc;
+}
+
+.movie-actions button[aria-pressed="true"] {
+    color: #ff4d57;
+}
+
+.movie-rating {
+    margin: 10px 0 0;
+    color: #ffad00;
+    font-size: 18px;
+    letter-spacing: 1px;
+}
+
+.movies-content button:focus-visible {
+    outline: 3px solid #9333ea;
+    outline-offset: 3px;
+}
+
+/* Celular */
+
+@media (max-width: 768px) {
+    .movies-content {
+        padding: 24px 16px;
+    }
+
+    .movies-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .movies-heading h1 {
+        font-size: 28px;
+    }
+
+    .movies-columns {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 400px) {
+    .movie-card {
+        gap: 8px;
+    }
+
+    .movie-poster,
+    img.movie-poster,
+    .movie-poster img {
+        width: 65px;
+        height: 95px;
+    }
+}
