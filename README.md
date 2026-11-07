@@ -1,692 +1,293 @@
-# 📚 Nexus
+# Nexus
 
-> Plataforma Full Stack para gerenciamento de uma biblioteca pessoal de filmes, jogos e livros.
+**Biblioteca pessoal de filmes, jogos e livros, com foco em desenvolvimento backend Python.**
 
-O **Nexus** é uma aplicação desenvolvida para permitir que usuários pesquisem, adicionem e acompanhem conteúdos que desejam consumir.
+O Nexus é um projeto pessoal de portfólio para organizar conteúdos em um só lugar. A API permite manter uma biblioteca individual, acompanhar o status de cada item e registrar avaliações, integrando informações de três serviços externos.
 
-O projeto combina **FastAPI, React, PostgreSQL e MongoDB**, além de integrar diferentes APIs externas para obtenção de informações sobre filmes, jogos e livros.
+O projeto reúne autenticação com JWT, controle de acesso por usuário, persistência em PostgreSQL e MongoDB e testes automatizados. A interface web em React está em desenvolvimento.
 
-O principal objetivo do projeto é aplicar conceitos de desenvolvimento de software em um cenário próximo de uma aplicação real, incluindo **autenticação, autorização, segurança, persistência de dados, integração com APIs externas e regras de negócio**.
+## Tecnologias
 
----
+| Camada | Tecnologias |
+| --- | --- |
+| Backend | Python, FastAPI, Pydantic, Uvicorn |
+| Autenticação | PyJWT, Argon2, cookies HttpOnly |
+| Persistência | PostgreSQL com psycopg2; MongoDB com PyMongo |
+| Integrações | Requests, TMDB, IGDB e Open Library |
+| Frontend | React, JavaScript/JSX, React Router, CSS e Vite |
+| Testes | Pytest, FastAPI TestClient e simulação de dependências |
 
-## ✨ Funcionalidades
+## Funcionalidades
 
-### 👤 Autenticação
+### Usuários e autenticação
 
-* Cadastro de usuários
-* Login e logout
-* Access Token utilizando JWT
-* Refresh Token utilizando JWT
-* Rotação de Refresh Tokens
-* Revogação de tokens
-* Cookies `HttpOnly`
-* Hash de senhas utilizando Argon2
-* Rotas protegidas
+- Cadastro e login com validação de dados.
+- Hash de senhas com Argon2.
+- Access token JWT com duração de 15 minutos.
+- Refresh token JWT com duração de 30 dias, armazenado como hash no PostgreSQL.
+- Rotação de refresh tokens e revogação no logout.
+- Armazenamento dos tokens no navegador por cookies HttpOnly.
+- Consulta de perfil, alteração de nome e senha e exclusão da conta.
 
-### 📚 Biblioteca pessoal
+### Biblioteca pessoal
 
-Cada usuário possui sua própria biblioteca.
+- Adição, listagem e remoção de filmes, jogos e livros.
+- Cadastro manual de conteúdos.
+- Registro de status e avaliação.
+- Atualização parcial com PATCH, preservando os campos não enviados.
+- Consultas e alterações da biblioteca vinculadas ao usuário autenticado.
 
-É possível:
+### Integrações externas
 
-* Adicionar conteúdos
-* Listar conteúdos
-* Alterar status
-* Atribuir avaliação
-* Atualizar parcialmente um conteúdo
-* Remover conteúdos
-* Adicionar conteúdos manualmente
+| Conteúdo | Serviço | Dados utilizados |
+| --- | --- | --- |
+| Filmes | TMDB | Títulos, sinopse, lançamento, gêneros e pôster |
+| Jogos | IGDB | Nome, lançamento, gêneros e capa |
+| Livros | Open Library | Informações bibliográficas e capa, conforme disponibilidade |
 
-### 🔎 Busca de conteúdos
+O backend normaliza títulos e trata respostas inválidas, indisponibilidade e tempo limite das consultas externas. Os conteúdos obtidos são vinculados ao catálogo no MongoDB e à biblioteca do usuário no PostgreSQL.
 
-O sistema utiliza diferentes fontes dependendo do tipo de conteúdo:
-
-| Tipo      | Fonte        |
-| --------- | ------------ |
-| 🎬 Filmes | TMDB         |
-| 🎮 Jogos  | IGDB         |
-| 📚 Livros | Open Library |
-
-O catálogo é armazenado no **MongoDB**, enquanto a relação entre usuário e conteúdo é armazenada no **PostgreSQL**.
-
----
-
-# 🏗️ Arquitetura
-
-A aplicação utiliza uma arquitetura híbrida, separando os dados de catálogo dos dados relacionados aos usuários.
+## Arquitetura
 
 ```text
-                         ┌─────────────────────┐
-                         │      FRONTEND       │
-                         │   React + TypeScript│
-                         └──────────┬──────────┘
-                                    │
-                               HTTP / REST
-                                    │
-                                    ▼
-                         ┌─────────────────────┐
-                         │       FASTAPI       │
-                         │       Backend       │
-                         └─────────┬───────────┘
-                                   │
-                   ┌───────────────┴───────────────┐
-                   │                               │
-                   ▼                               ▼
-        ┌─────────────────────┐         ┌─────────────────────┐
-        │     PostgreSQL      │         │       MongoDB       │
-        │                     │         │                     │
-        │ • Usuários          │         │ • Filmes            │
-        │ • Refresh Tokens    │         │ • Jogos             │
-        │ • Biblioteca        │         │ • Livros            │
-        │ • Status            │         │ • Dados externos    │
-        │ • Avaliações        │         │                     │
-        └─────────────────────┘         └──────────┬──────────┘
-                                                   │
-                                      ┌────────────┼────────────┐
-                                      │            │            │
-                                      ▼            ▼            ▼
-                                    TMDB         IGDB      Open Library
+React + JavaScript (em desenvolvimento)
+                  |
+             HTTP + cookies
+                  |
+             FastAPI / Python
+                  |
+       +----------+-----------+
+       |                      |
+   PostgreSQL              MongoDB
+   - usuários              - catálogo de conteúdos
+   - refresh tokens        - metadados dos provedores
+   - biblioteca pessoal
+
+O backend também consulta TMDB, IGDB e Open Library.
 ```
 
-### Por que dois bancos?
+O PostgreSQL armazena os dados relacionais dos usuários e suas bibliotecas. O MongoDB armazena documentos de catálogo com campos que variam conforme o tipo de conteúdo e o provedor. A biblioteca referencia o identificador do documento de catálogo.
 
-**PostgreSQL** é utilizado para dados relacionais e transacionais, como usuários, autenticação e bibliotecas pessoais.
+As rotas estão separadas em módulos de autenticação, usuários e biblioteca. A validação de entrada utiliza Pydantic, e o tratamento compartilhado de erros de banco está em `routers/db_errors.py`.
 
-**MongoDB** é utilizado como catálogo de conteúdos, permitindo armazenar documentos provenientes de diferentes APIs externas com estruturas que podem variar entre si.
+## Estado atual
 
-Essa separação evita misturar o catálogo global com os dados privados de cada usuário.
+| Área | Situação |
+| --- | --- |
+| API de autenticação, usuários e biblioteca | Implementada |
+| Integrações com os três provedores | Implementadas |
+| Persistência em PostgreSQL e MongoDB | Implementada |
+| Testes automatizados e integração com PostgreSQL | Presentes no repositório |
+| Frontend | Em desenvolvimento: cadastro, login, verificação de sessão e estrutura das páginas |
+| Dashboard e apresentação dos conteúdos | Integração parcial; ainda há dados de exemplo na interface |
+| Docker, Redis, CI/CD e deploy | Planejados |
 
----
+A implementação atual do frontend utiliza **JavaScript/JSX**. O projeto ainda exige ajustes para implantação em produção.
 
-# 🛠️ Stack
-
-### Backend
-
-![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge\&logo=python\&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge\&logo=fastapi\&logoColor=white)
-
-* Python
-* FastAPI
-* Pydantic
-* Psycopg
-* PyJWT
-* Argon2
-
-### Frontend
-
-![React](https://img.shields.io/badge/React-20232A?style=for-the-badge\&logo=react\&logoColor=61DAFB)
-![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge\&logo=typescript\&logoColor=white)
-
-* React
-* TypeScript
-
-### Banco de dados
-
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge\&logo=postgresql\&logoColor=white)
-![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge\&logo=mongodb\&logoColor=white)
-
-* PostgreSQL
-* MongoDB
-
-### APIs externas
-
-* 🎬 TMDB
-* 🎮 IGDB
-* 📚 Open Library
-
----
-
-# 🔐 Autenticação e segurança
-
-A autenticação utiliza **JWT com Access Token e Refresh Token**.
+## Estrutura do projeto
 
 ```text
-                    LOGIN
-                      │
-                      ▼
-              Validação da senha
-                      │
-                      ▼
-             ┌─────────────────┐
-             │   Argon2 Hash   │
-             └────────┬────────┘
-                      │
-                      ▼
-             Geração dos tokens
-                      │
-             ┌────────┴────────┐
-             ▼                 ▼
-        Access Token      Refresh Token
-          curto              longo
-             │                 │
-             │                 ▼
-             │          PostgreSQL
-             │
-             ▼
-       Rotas protegidas
+.
+├── api routes/
+│   ├── main.py
+│   ├── requirements.txt
+│   ├── routers/
+│   │   ├── auth/routes.py
+│   │   ├── library/routes.py
+│   │   ├── users/routes.py
+│   │   └── db_errors.py
+│   └── tests/
+├── front/nexus/
+│   ├── package.json
+│   └── src/
+├── originais/
+│   ├── sql_proj.psql
+│   └── migrations/001_library_columns.sql
+├── modelos/
+└── README.md
 ```
 
-### Access Token
+## Executar localmente
 
-Utilizado para autorizar as requisições autenticadas.
+### Pré-requisitos
 
-Possui duração curta para reduzir o impacto de uma eventual exposição.
+- Python com suporte às dependências de `api routes/requirements.txt`.
+- Node.js e npm compatíveis com a versão do Vite declarada em `front/nexus/package.json`.
+- PostgreSQL e MongoDB acessíveis localmente ou por conexão remota.
+- Credenciais TMDB e Twitch/IGDB para as respectivas integrações. A consulta atual à Open Library não utiliza chave de API.
 
-### Refresh Token
+Os comandos abaixo usam PowerShell e partem da raiz do repositório.
 
-Permite gerar novos Access Tokens sem exigir que o usuário faça login novamente.
+### 1. Preparar o backend
 
-Os Refresh Tokens são armazenados no banco de dados e podem ser **revogados e rotacionados**.
-
-### Proteções utilizadas
-
-* 🔒 Argon2 para senhas
-* 🔑 JWT
-* 🍪 Cookies `HttpOnly`
-* 🛡️ Rotas protegidas
-* 🔄 Rotação de Refresh Tokens
-* 🚫 Revogação de sessões
-* 👤 Isolamento da biblioteca por usuário
-
----
-
-# 📖 Biblioteca do usuário
-
-A biblioteca utiliza uma relação entre o usuário e o conteúdo.
-
-```text
-             USER
-              │
-              │ 1:N
-              ▼
-        USER_LIBRARY
-              │
-              │ N:1
-              ▼
-           CONTENT
+```powershell
+cd "api routes"
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
 ```
 
-Um registro da biblioteca contém informações como:
+### 2. Configurar as variáveis de ambiente
 
-```text
-user_id
-content_id
-name
-status
-rating
-created_at
-external_api_id
+Crie `api routes/.env` com os nomes utilizados pelo código:
+
+```dotenv
+# PostgreSQL
+DBNAME=nexus
+HOST=localhost
+PORT=5432
+USER=postgres
+PASSWORD=substitua_pela_senha_local
+
+# JWT
+SECRET_KEY=substitua_por_uma_chave_aleatoria_longa
+ALGORITHM=HS256
+
+# MongoDB
+CONNECTION_STRING=mongodb://localhost:27017/
+DATABASE=nexus
+COLECAO=contents
+
+# Provedores externos
+TMDB_KEY=substitua_pela_chave_tmdb
+TWITCH_CLIENT_ID=substitua_pelo_client_id
+TWITCH_CLIENT_SECRET=substitua_pelo_client_secret
 ```
 
-Isso permite que diferentes usuários adicionem o mesmo conteúdo às suas bibliotecas sem duplicar o conteúdo no catálogo.
+Para gerar uma chave JWT local:
 
----
-
-# 🔎 Fluxo de busca
-
-A aplicação evita consultar APIs externas sempre que o conteúdo já estiver disponível no catálogo.
-
-```text
-                    Pesquisa
-                       │
-                       ▼
-                 ┌───────────┐
-                 │  MongoDB  │
-                 └─────┬─────┘
-                       │
-                ┌──────┴──────┐
-                │             │
-             Encontrou     Não encontrou
-                │             │
-                │             ▼
-                │       API externa
-                │             │
-                │       ┌─────┴─────┐
-                │       │           │
-                │    Encontrou   Não encontrou
-                │       │           │
-                │       ▼           ▼
-                │    MongoDB    Cadastro manual
-                │       │           │
-                └───────┴───────────┘
-                            │
-                            ▼
-                    Biblioteca do usuário
+```powershell
+python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-Esse fluxo reduz chamadas desnecessárias às APIs externas e permite manter um catálogo local.
+Mantenha o `.env` fora do versionamento. Os valores acima são exemplos e devem ser substituídos pela configuração do seu ambiente.
 
----
+### 3. Preparar o PostgreSQL
 
-# 🎬 Filmes
+Crie o banco informado em `DBNAME`. No arquivo `originais/sql_proj.psql`, execute **somente os três comandos CREATE TABLE iniciais**, que definem `users`, `refreshToken` e `userLibrary`.
 
-Os filmes são obtidos através da **TMDB API**.
+O restante do arquivo contém INSERTs demonstrativos com senhas e tokens fictícios; esses registros não constituem contas válidas para autenticação.
 
-Informações utilizadas:
+Para bancos antigos sem `external_api_id` e `content_type`, consulte `originais/migrations/001_library_columns.sql` antes de executar a API.
 
-* Título
-* Título original
-* Sinopse
-* Data de lançamento
-* Gêneros
-* Identificador externo
-* Imagem de capa
+O MongoDB deve estar disponível na conexão configurada. O banco e a coleção são utilizados pelo backend nas operações de catálogo.
 
----
+### 4. Iniciar a API
 
-# 🎮 Jogos
+Ainda em `api routes/`, com o ambiente virtual ativado:
 
-Os jogos são obtidos através da **IGDB API**.
-
-Informações utilizadas:
-
-* Nome
-* Sinopse
-* Data de lançamento
-* Gêneros
-* Capa
-* Identificador externo
-
-Também foi considerada a utilização de `game_localizations` para priorizar informações localizadas em português.
-
----
-
-# 📚 Livros
-
-Os livros são obtidos através da **Open Library API**.
-
-Informações utilizadas:
-
-* Título
-* Autor
-* Identificador da obra
-* Data de publicação
-* Assuntos/gêneros
-* Capa
-
-Os assuntos retornados pela API são tratados antes de serem armazenados para gerar uma lista de gêneros mais adequada.
-
----
-
-# 🌎 Normalização de dados
-
-Como diferentes APIs podem utilizar títulos diferentes para o mesmo conteúdo, o backend possui uma etapa de normalização.
-
-O processo inclui:
-
-* Conversão para lowercase
-* Remoção de acentos
-* Normalização de texto
-* Tratamento de títulos equivalentes
-
-Exemplo:
-
-```text
-De Volta para o Futuro 3
+```powershell
+python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-pode ser normalizado para facilitar a comparação com outras fontes.
+- API: http://localhost:8000
+- Documentação interativa: http://localhost:8000/docs
+- Especificação OpenAPI: http://localhost:8000/openapi.json
 
-Essa estratégia ajuda a reduzir duplicidades e melhorar as buscas.
+O PostgreSQL precisa estar disponível ao iniciar a aplicação, pois os módulos de rotas abrem conexões durante a importação.
 
----
+### 5. Iniciar o frontend
 
-# 📝 Cadastro manual
+Em outro terminal, a partir da raiz:
 
-Caso um conteúdo não seja encontrado nas fontes externas, o usuário pode cadastrá-lo manualmente.
-
-Isso permite que o sistema continue funcionando mesmo quando determinado conteúdo não estiver disponível nas APIs utilizadas.
-
-```text
-API externa
-     │
-     ├── Encontrado ──► Catálogo
-     │
-     └── Não encontrado
-              │
-              ▼
-       Cadastro manual
-              │
-              ▼
-           Catálogo
+```powershell
+cd "front/nexus"
+npm install
+npm run dev -- --port 5173 --strictPort
 ```
 
----
+Acesse http://localhost:5173. Atualmente, as chamadas do frontend apontam para `http://localhost:8000`, e o CORS do backend permite `http://localhost:5173`. Utilize esses endereços de forma consistente ao testar a sessão por cookies.
 
-# 🌐 API REST
+## Endpoints
 
-A API é construída utilizando **FastAPI**.
+| Método | Rota | Finalidade | Autenticação |
+| --- | --- | --- | --- |
+| POST | `/register` | Cadastrar usuário | Não |
+| POST | `/login` | Iniciar sessão | Não |
+| POST | `/refresh` | Renovar tokens | Refresh token em cookie |
+| POST | `/logout` | Revogar sessão e remover cookies | Cookie da sessão, quando presente |
+| GET | `/users/me` | Consultar perfil e itens vinculados | Access token em cookie |
+| PATCH | `/users/me` | Alterar nome | Access token em cookie |
+| PATCH | `/users/me/password` | Alterar senha | Access token em cookie |
+| DELETE | `/users/me/delete` | Excluir conta e dados relacionais vinculados | Access token em cookie |
+| GET | `/library` | Listar biblioteca pessoal | Access token em cookie |
+| POST | `/library` | Adicionar conteúdo usando provedor externo | Access token em cookie |
+| POST | `/library/manual` | Cadastrar conteúdo manualmente | Access token em cookie |
+| PATCH | `/library/{id}` | Atualizar status e/ou avaliação | Access token em cookie |
+| DELETE | `/library/{id}` | Remover item da biblioteca | Access token em cookie |
 
-Principais grupos de endpoints:
+### Exemplos de requisição
 
-```text
-/auth
-/users
-/library
-/content
-```
-
-### Authentication
-
-```http
-POST /auth/register
-POST /auth/login
-POST /auth/refresh
-POST /auth/logout
-```
-
-### Users
-
-```http
-GET   /users/me
-PATCH /users/me
-```
-
-### Library
-
-```http
-GET    /library
-POST   /library
-PATCH  /library/{id}
-DELETE /library/{id}
-
-POST   /library/manual
-```
-
----
-
-# 🔄 PATCH e atualização parcial
-
-A atualização da biblioteca utiliza `PATCH`, permitindo alterar somente os campos desejados.
-
-Por exemplo:
+Cadastro em `POST /register`:
 
 ```json
 {
-  "status": "Concluído"
+  "email": "pessoa@example.com",
+  "password": "SenhaLocal123!",
+  "name": "Pessoa Exemplo"
 }
 ```
 
-Somente o status será alterado.
-
-Também é possível enviar:
+Adição em `POST /library`, após o login:
 
 ```json
 {
+  "title": "Duna",
+  "type": "movie"
+}
+```
+
+Os tipos aceitos são `movie`, `game` e `book`.
+
+Atualização em `PATCH /library/{id}`:
+
+```json
+{
+  "status": "Concluído",
   "rating": 5
 }
 ```
 
-Nesse caso, o status atual permanece intacto.
+É possível enviar apenas `status` ou apenas `rating`. Os campos omitidos preservam seus valores atuais. Para os demais modelos, consulte `/docs`.
 
-Isso evita que informações existentes sejam sobrescritas desnecessariamente.
+## Testes
 
----
+Na pasta `api routes/`, com o ambiente virtual ativado:
 
-# 🗄️ Modelo de dados
+```powershell
+# Executar os testes que não exigem PostgreSQL real
+python -m pytest tests -v
 
-### PostgreSQL
+# Executar toda a suíte, incluindo integração com PostgreSQL
+python -m pytest tests -v --run-integration
 
-Responsável principalmente pelos dados relacionados aos usuários:
-
-```text
-users
-   │
-   ├── refresh_tokens
-   │
-   └── user_library
-             │
-             ▼
-         content_id
+# Executar somente os testes de integração
+python -m pytest tests -v -m integration --run-integration
 ```
 
-### MongoDB
+Os testes incluem cenários de cadastro, login, renovação e revogação de sessão, perfil, biblioteca, isolamento entre usuários, validação de entradas e falhas de serviços externos.
 
-Responsável pelo catálogo:
+Os testes de integração criam bancos temporários com prefixo `nexus_pytest_`, inicializam o esquema e removem os bancos ao finalizar. O usuário PostgreSQL configurado precisa ter permissão para criar bancos; interrupções abruptas podem impedir a limpeza.
 
-```text
-contents
-   │
-   ├── movies
-   ├── games
-   ├── books
-   └── manual
-```
+MongoDB e os serviços externos são simulados na suíte. Portanto, esses testes não validam a disponibilidade nem as credenciais reais dos provedores. Detalhes adicionais estão em [tests/README.md](api%20routes/tests/README.md).
 
-A estrutura do documento pode conter:
+## Próximas etapas
 
-```json
-{
-  "external_api": "tmdb",
-  "external_api_id": "123456",
-  "title": "Título",
-  "description": "Descrição",
-  "release_date": "2025-01-01",
-  "genres": [],
-  "cover": "..."
-}
-```
+- [ ] Concluir a integração das páginas React com a biblioteca e os metadados do catálogo.
+- [ ] Substituir os dados de exemplo do dashboard por dados reais.
+- [ ] Completar os fluxos da interface para busca, cadastro manual, edição e remoção.
+- [ ] Ajustar e validar o comportamento de sessão para produção com HTTPS.
+- [ ] Containerizar os serviços com Docker.
+- [ ] Avaliar Redis para cache.
+- [ ] Automatizar verificações com GitHub Actions.
+- [ ] Preparar e documentar o deploy.
 
-# ⚙️ Configuração
+## Aprendizados aplicados
 
-## 1. Clone o projeto
+O Nexus foi criado para praticar o desenvolvimento de uma aplicação com regras de negócio e múltiplas dependências: modelagem relacional e documental, integração de APIs, autenticação, autorização por usuário, validação e testes de cenários de sucesso e falha.
 
-```bash
-git clone <URL_DO_REPOSITORIO>
-cd <PASTA_DO_PROJETO>
-```
+## Autor
 
-## 2. Crie o ambiente virtual
+**Paulo Gabriel Lima Santos**
 
-```bash
-python -m venv venv
-```
-
-### Windows
-
-```bash
-venv\Scripts\activate
-```
-
-### Linux/macOS
-
-```bash
-source venv/bin/activate
-```
-
-## 3. Instale as dependências
-
-```bash
-pip install -r requirements.txt
-```
-
-## 4. Configure o `.env`
-
-Crie um arquivo `.env` baseado no `.env.example`.
-
-```env
-DATABASE_URL=
-
-MONGODB_CONNECTION_STRING=
-DATABASE=
-COLECAO=
-
-SECRET_KEY=
-ALGORITHM=
-
-TMDB_KEY=
-
-IGDB_CLIENT_ID=
-IGDB_CLIENT_SECRET=
-```
-
-> ⚠️ Nunca versione o arquivo `.env` contendo credenciais reais.
-
-## 5. Execute o backend
-
-```bash
-uvicorn main:app --reload
-```
-
-A API estará disponível em:
-
-```text
-http://127.0.0.1:8000
-```
-
-Swagger:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
----
-
-# 🧪 Testes
-
-A estratégia de testes do projeto será baseada em **Pytest**.
-
-Áreas previstas:
-
-```text
-Authentication
-    ├── Register
-    ├── Login
-    ├── Refresh
-    └── Logout
-
-Library
-    ├── Create
-    ├── Read
-    ├── Update
-    └── Delete
-
-Content
-    ├── Search
-    ├── External APIs
-    └── Manual creation
-```
-
----
-
-# 📊 Status do projeto
-
-### Backend
-
-* [x] Cadastro de usuários
-* [x] Login
-* [x] Logout
-* [x] JWT Access Token
-* [x] JWT Refresh Token
-* [x] Rotação de Refresh Token
-* [x] Revogação de tokens
-* [x] Argon2
-* [x] Cookies HttpOnly
-* [x] Rotas protegidas
-* [x] Biblioteca por usuário
-* [x] Adição de conteúdo
-* [x] Atualização parcial
-* [x] Remoção de conteúdo
-* [x] Status
-* [x] Avaliação
-* [x] Cadastro manual
-
-### Integrações
-
-* [x] TMDB
-* [x] IGDB
-* [x] Open Library
-* [x] MongoDB como catálogo
-* [x] Normalização de títulos
-
-### Frontend
-
-* [ ] Interface React
-* [ ] Autenticação
-* [ ] Dashboard
-* [ ] Biblioteca
-* [ ] Busca
-* [ ] Página de detalhes
-
-### Infraestrutura
-
-* [ ] Docker
-* [ ] Redis
-* [ ] Pytest
-* [ ] GitHub Actions
-* [ ] Deploy
-
----
-
-# 🚧 Roadmap
-
-```text
-[x] Backend API
-[x] Authentication
-[x] PostgreSQL
-[x] MongoDB
-[x] External APIs
-[x] Personal library
-
-[ ] React frontend
-[ ] Automated tests
-[ ] Docker
-[ ] Redis
-[ ] CI/CD
-[ ] Production deployment
-```
-
-### Próximas etapas
-
-* Desenvolver a interface React + TypeScript
-* Implementar testes automatizados
-* Dockerizar os serviços
-* Adicionar Redis para cache
-* Configurar CI com GitHub Actions
-* Preparar ambiente de produção
-* Melhorar sistema de busca
-* Criar dashboard com estatísticas
-* Adicionar reviews e anotações
-
----
-
-# 🎯 Objetivos técnicos
-
-Este projeto foi desenvolvido como um projeto de portfólio com foco em **Backend Python e desenvolvimento Full Stack**.
-
-Os principais conceitos praticados incluem:
-
-* Desenvolvimento de APIs REST
-* FastAPI
-* Autenticação JWT
-* Access e Refresh Tokens
-* Cookies HttpOnly
-* Hash de senhas com Argon2
-* PostgreSQL
-* MongoDB
-* Modelagem de dados
-* Integração com APIs externas
-* Normalização de dados
-* Regras de negócio
-* Controle de acesso
-* Atualização parcial com PATCH
-* Separação entre catálogo e dados privados
-* Tratamento de fallback
-* Arquitetura de aplicações Full Stack
-
----
-
-# 👨‍💻 Autor
-
-**Paulo Gabriel**
-
-Desenvolvedor de Software Júnior com foco em **Backend Python e desenvolvimento Full Stack**.
-
-Tecnologias principais:
-
-`Python` · `FastAPI` · `PostgreSQL` · `MongoDB` · `React` · `TypeScript`
-
----
-
-⭐ Se este projeto foi útil ou interessante, considere deixar uma estrela no repositório.
+Desenvolvedor de Software Júnior com foco em backend Python.
