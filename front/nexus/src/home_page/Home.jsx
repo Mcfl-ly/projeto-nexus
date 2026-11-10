@@ -18,8 +18,31 @@ function Home() {
   const id = user?.id;
 
   const [library, setLibrary] = useState(null);
+  const [ids, setIds] = useState([]);
   const [libraryError, setLibraryError] = useState("");
   const [loadingLibrary, setLoadingLibrary] = useState(true);
+
+  async function sendIdsToMongo(ids, signal) {
+    const response = await fetch("http://localhost:8000/get_mongo", {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ids }),
+      signal,
+    });
+
+    if (!response.ok) {
+      const erro = await response.json();
+      console.log("Detalhes do erro:", erro.detail);
+      throw new Error(`Erro ao enviar IDs: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log(data);
+    return data;
+  }
 
   useEffect(() => {
     if (id == null) return;
@@ -31,15 +54,11 @@ function Home() {
       setLibraryError("");
 
       try {
-        // Ajuste o parâmetro conforme a definição da sua API.
-        const response = await fetch(
-            `http://localhost:8000/library`,
-            {
-              method: "GET",
-              credentials: "include",
-              signal: controller.signal,
-            }
-        );
+        const response = await fetch("http://localhost:8000/library", {
+          method: "GET",
+          credentials: "include",
+          signal: controller.signal,
+        });
 
         if (!response.ok) {
           throw new Error(
@@ -48,8 +67,9 @@ function Home() {
         }
 
         const data = await response.json();
-        console.log(data);
+
         if (!controller.signal.aborted) {
+          setIds(data.map((item) => item[2]));
           setLibrary(data);
         }
       } catch (error) {
@@ -68,6 +88,26 @@ function Home() {
     return () => controller.abort();
   }, [id]);
 
+  useEffect(() => {
+    if (ids.length === 0) return;
+
+    const controller = new AbortController();
+
+    async function enviarIds() {
+      try {
+        await sendIdsToMongo(ids, controller.signal);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setLibraryError(error.message);
+        }
+      }
+    }
+
+    enviarIds();
+
+    return () => controller.abort();
+  }, [ids]);
+
   if (!user) {
     return <p>Dados do usuário não foram recebidos.</p>;
   }
@@ -83,8 +123,6 @@ function Home() {
   if (libraryError) {
     return <p role="alert">{libraryError}</p>;
   }
-
-
 
 
   return (
