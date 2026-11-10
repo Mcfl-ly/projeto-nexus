@@ -2,7 +2,7 @@ from typing import Literal
 import json
 from routers.db_errors import handle_database_errors
 from deep_translator import GoogleTranslator
-from fastapi import FastAPI, HTTPException, status, Response, Request, APIRouter, Depends
+from fastapi import FastAPI,Body, HTTPException, status, Response, Request, APIRouter, Depends
 import psycopg2
 import datetime
 import dotenv
@@ -131,6 +131,13 @@ def _add_catalog_content(title, user, search, label, initial_status):
     dados = search(title.title)
     if not dados:
         raise HTTPException(status_code=404, detail=f"{label} não encontrado.")
+    # A identidade do provedor independe da grafia usada na pesquisa.
+    cursor.execute(
+        "SELECT id FROM userlibrary WHERE user_id = %s AND external_api_id = %s AND content_type = %s",
+        (int(user), str(dados["external_id"]), title.type),
+    )
+    if cursor.fetchone():
+        return f"{label.lower()} já existe no seu catálogo."
     client = MongoClient(connection_string, serverSelectionTimeoutMS=5000)
     try:
         collection = client[os.getenv("DATABASE")][os.getenv("COLECAO")]
@@ -350,104 +357,55 @@ def get_current_user(request: Request):
     # genres: list | None = None
     # img_url: str | None = None
 
-def add_manual_movie_to_library(dados, user):
-    client = MongoClient(connection_string)
+def _add_manual_content(dados, user, label, initial_status):
+    normalized_title = normalize_text(dados.title)
+    cursor.execute(
+        "SELECT name FROM userlibrary WHERE user_id = %s AND content_type = %s",
+        (int(user), dados.type),
+    )
+    if any(normalize_text(row[0]) == normalized_title for row in cursor.fetchall()):
+        return f"{label.lower()} já existe no seu catálogo."
+
+    client = MongoClient(connection_string, serverSelectionTimeoutMS=5000)
     try:
-        db = client[os.getenv("DATABASE")]
-        colecao = db[os.getenv("COLECAO")]
-    
-        data_to_insert = {
-            "title": dados.title,
-            "author": dados.author,
-            "release_date": dados.release_date,
-            "genres": dados.genres,
-            "img_url": dados.img_url,
-            "type": dados.type,
-        }
-        colecao.insert_one(data_to_insert)
-        movie = colecao.find_one({"title": dados.title})
-        insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
-    
-        cursor.execute(insert_sql, (
-            user,
-            str(movie["_id"]),
-            movie["title"],
-            "Quero Assistir",
-            None,
-            datetime.date.today(),
-            None,
-            "movie"
-    
-        ))
+        collection = client[os.getenv("DATABASE")][os.getenv("COLECAO")]
+        # Documento manual: nao reutilizar outro tipo ou resultado de provedor.
+        content = collection.find_one({
+            "title": normalized_title, "type": dados.type,
+            "external_id": {"$exists": False},
+        })
+        if content is None:
+            content = {
+                "title": normalized_title, "type": dados.type,
+                "release_date": dados.release_date, "genres": dados.genres,
+                "img_url": dados.img_url,
+            }
+            if dados.type != "game":
+                content["author"] = dados.author
+            result = collection.insert_one(content)
+            content["_id"] = result.inserted_id
+        cursor.execute(
+            "INSERT INTO userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            (int(user), str(content["_id"]), normalized_title, initial_status,
+             None, datetime.date.today(), None, dados.type),
+        )
         connection.commit()
+        return f"{label} adicionado com sucesso."
     finally:
         client.close()
+
+
+def add_manual_movie_to_library(dados, user):
+    return _add_manual_content(dados, user, "Filme", "Quero Assistir")
+
 
 def add_manual_game_to_library(dados, user):
-    client = MongoClient(connection_string)
-    try:
-        db = client[os.getenv("DATABASE")]
-        colecao = db[os.getenv("COLECAO")]
-    
-        data_to_insert = {
-            "title": dados.title,
-            "release_date": dados.release_date,
-            "genres": dados.genres,
-            "img_url": dados.img_url,
-            "type": dados.type,
-        }
-        colecao.insert_one(data_to_insert)
-        game = colecao.find_one({"title": dados.title})
-        insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
-    
-        cursor.execute(insert_sql, (
-            user,
-            str(game["_id"]),
-            game["title"],
-            "Quero Jogar",
-            None,
-            datetime.date.today(),
-            None,
-            "game"
-    
-        ))
-        connection.commit()
-    finally:
-        client.close()
+    return _add_manual_content(dados, user, "Jogo", "Quero Jogar")
+
 
 def add_manual_book_to_library(dados, user):
-    client = MongoClient(connection_string)
-    try:
-        db = client[os.getenv("DATABASE")]
-        colecao = db[os.getenv("COLECAO")]
-    
-        data_to_insert = {
-            "title": dados.title,
-            "author": dados.author,
-            "release_date": dados.release_date,
-            "genres": dados.genres,
-            "img_url": dados.img_url,
-            "type": dados.type,
-        }
-        colecao.insert_one(data_to_insert)
-        book = colecao.find_one({"title": dados.title})
-    
-        insert_sql = "insert into userlibrary (user_id, content_id, name, status, rating, created_at, external_api_id, content_type) values (%s, %s, %s, %s, %s, %s, %s, %s)"
-    
-        cursor.execute(insert_sql, (
-            user,
-            str(book["_id"]),
-            book["title"],
-            "Quero Ler",
-            None,
-            datetime.date.today(),
-            None,
-            "book"
-    
-        ))
-        connection.commit()
-    finally:
-        client.close()
+    return _add_manual_content(dados, user, "Livro", "Quero Ler")
+
 # ----ROTAS----
 @router.get("/library")
 @handle_database_errors(lambda: connection)
@@ -546,3 +504,9 @@ async def add_manual_content(dados: ManualContent, user = Depends(get_current_us
         return add_manual_game_to_library(dados, user)
     else:
         return add_manual_book_to_library(dados, user)
+
+
+@router.post("/get_mongo")
+@handle_database_errors(lambda: connection)
+async def get_mongo_library(dados: dict = Body(...), user = Depends(get_current_user)):
+    print(dados)

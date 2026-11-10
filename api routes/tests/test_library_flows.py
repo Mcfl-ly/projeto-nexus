@@ -41,12 +41,14 @@ def test_duplicate_library_content_does_not_insert(logged_api, monkeypatch, kind
 @pytest.mark.parametrize("kind", ["movie", "game", "book"])
 def test_manual_content_insert(logged_api, kind):
     api = logged_api
-    api.collection.find_one.return_value = {"_id": "manual123", "title": "Manual"}
+    api.db.library.cursor.return_value.fetchall.return_value = []
+    api.collection.find_one.return_value = None
+    api.collection.insert_one.return_value.inserted_id = "manual123"
     response = api.client.post("/library/manual", json={"title": "Manual", "type": kind, "author": ["Autor"]})
     assert response.status_code == 200
     api.collection.insert_one.assert_called_once()
     values = api.db.library.cursor.return_value.execute.call_args.args[1]
-    assert values[0] == "1" and values[1] == "manual123" and values[-1] == kind
+    assert values[0] == 1 and values[1] == "manual123" and values[-1] == kind
     api.db.library.commit.assert_called_once()
 
 
@@ -175,3 +177,44 @@ def test_igdb_token_is_cached(api, monkeypatch):
 @pytest.mark.parametrize("title,expected", [("  AÇÃO  ", "acao"), ("Duna", "duna"), ("", "")])
 def test_normalize_titles(api, title, expected):
     assert api.modules.library.normalize_text(title) == expected
+
+
+@pytest.mark.parametrize("kind", ["movie", "game", "book"])
+def test_duplicate_external_identity_with_different_title(logged_api, monkeypatch, kind):
+    api = logged_api
+    cursor = api.db.library.cursor.return_value
+    cursor.fetchone.side_effect = [None, (2,)]
+    monkeypatch.setattr(api.modules.library, f"search_{kind}_in_external_api", Mock(
+        return_value={"external_id": 165, "title": "titulo normalizado", "type": kind}))
+    response = api.client.post("/library", json={"title": "Outro Titulo", "type": kind})
+    assert response.status_code == 200
+    assert "existe" in response.json()
+    assert cursor.execute.call_args.args[1] == (1, "165", kind)
+    api.collection.insert_one.assert_not_called()
+    api.db.library.commit.assert_not_called()
+
+
+@pytest.mark.parametrize("kind", ["movie", "game", "book"])
+def test_manual_duplicate_normalizes_legacy_title(logged_api, kind):
+    api = logged_api
+    api.db.library.cursor.return_value.fetchall.return_value = [("  AÇÃO  ",)]
+    response = api.client.post("/library/manual", json={"title": "acao", "type": kind})
+    assert response.status_code == 200
+    assert "existe" in response.json()
+    api.modules.library.MongoClient.assert_not_called()
+    api.db.library.commit.assert_not_called()
+
+
+@pytest.mark.parametrize("kind", ["movie", "game", "book"])
+def test_manual_reuses_document_of_same_type(logged_api, kind):
+    api = logged_api
+    api.db.library.cursor.return_value.fetchall.return_value = []
+    api.collection.find_one.return_value = {"_id": "existing", "title": "acao", "type": kind}
+    response = api.client.post("/library/manual", json={"title": " Ação ", "type": kind})
+    assert response.status_code == 200
+    api.collection.find_one.assert_called_once_with({
+        "title": "acao", "type": kind, "external_id": {"$exists": False}})
+    api.collection.insert_one.assert_not_called()
+    values = api.db.library.cursor.return_value.execute.call_args.args[1]
+    assert values[1:3] == ("existing", "acao")
+    api.modules.library.MongoClient.return_value.close.assert_called_once()
