@@ -40,7 +40,7 @@ function Home() {
     }
 
     const data = await response.json();
-    console.log(data);
+    // console.log(data);
     return data;
   }
 
@@ -124,7 +124,7 @@ function Home() {
     return <p role="alert">{libraryError}</p>;
   }
 
-
+  console.log(library)
   return (
       <>
       <Header />
