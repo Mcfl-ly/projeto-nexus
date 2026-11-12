@@ -230,7 +230,7 @@ def search_game_in_external_api(title):
         return {
             "external_id": game["id"], "title": normalize_text(game["name"]),
             "release_date": release, "genres": [genre["name"] for genre in (game.get("genres") or [])],
-            "image_url": f"https://images.igdb.com/igdb/image/upload/t_original/{cover}.jpg" if cover else None,
+            "poster": f"https://images.igdb.com/igdb/image/upload/t_original/{cover}.jpg" if cover else None,
             "type": "game",
         }
     except (KeyError, TypeError, ValueError, AttributeError, OverflowError, OSError):
@@ -303,7 +303,7 @@ def search_book_in_external_api(title):
             "external_id": book["key"], "title": normalize_text(book["title"]),
             "author_name": book.get("author_name") or [], "release_date": book.get("first_publish_year"),
             "genres": extract_genres(book.get("subject") or []),
-            "image_url": f"https://covers.openlibrary.org/b/id/{cover}-L.jpg" if cover else None,
+            "poster": f"https://covers.openlibrary.org/b/id/{cover}-L.jpg" if cover else None,
             "type": "book",
         }
     except (KeyError, TypeError, AttributeError):
@@ -520,11 +520,10 @@ async def get_mongo_library(ids: dict = Body(...), user = Depends(get_current_us
 
         for i in ids["ids"]:
             result = collection.find_one({"_id": ObjectId(i)})
-            print(result)
-            print()
+
             content.append(result)
 
-
+        print(content)
         return jsonable_encoder(content, custom_encoder={ObjectId: str})
     finally:
         client.close()
