@@ -12,6 +12,9 @@ from pymongo import MongoClient
 import unicodedata
 import requests
 from pydantic import BaseModel, Field
+from bson import ObjectId
+from fastapi.encoders import jsonable_encoder
+
 # ----CONEXÕES----
 GENRE_MAP = {
     # Inglês
@@ -508,5 +511,23 @@ async def add_manual_content(dados: ManualContent, user = Depends(get_current_us
 
 @router.post("/get_mongo")
 @handle_database_errors(lambda: connection)
-async def get_mongo_library(dados: dict = Body(...), user = Depends(get_current_user)):
-    print(dados)
+async def get_mongo_library(ids: dict = Body(...), user = Depends(get_current_user)):
+    content = []
+    client = MongoClient(connection_string, serverSelectionTimeoutMS=5000)
+    try:
+        db = client[os.getenv("DATABASE")]
+        collection = db[os.getenv("COLECAO")]
+
+        for i in ids["ids"]:
+            result = collection.find_one({"_id": ObjectId(i)})
+            print(result)
+            print()
+            content.append(result)
+
+
+        return jsonable_encoder(content, custom_encoder={ObjectId: str})
+    finally:
+        client.close()
+
+    # for i in ids["ids"]:
+    #     print(i)
