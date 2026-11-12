@@ -132,14 +132,23 @@ body {
 
 .cover-wrapper {
     position: relative;
+    aspect-ratio: 2/3;
+    overflow: hidden;
+    border-radius: 10px;
+
+}
+
+.cover-wrapper a {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
 
 .cover-wrapper img {
     display: block;
     width: 100%;
-    aspect-ratio: 4 / 3;
-    object-fit: cover;
-    border-radius: 10px;
+    height: 100%;
+    object-fit: contain;
 }
 
 .cover-wrapper button {

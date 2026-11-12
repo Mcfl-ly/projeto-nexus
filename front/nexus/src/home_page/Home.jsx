@@ -19,6 +19,7 @@ function Home() {
 
   const [library, setLibrary] = useState(null);
   const [ids, setIds] = useState([]);
+  const [fullContent, setFullContent] = useState([]);
   const [libraryError, setLibraryError] = useState("");
   const [loadingLibrary, setLoadingLibrary] = useState(true);
 
@@ -41,6 +42,7 @@ function Home() {
 
     const data = await response.json();
     // console.log(data);
+    setFullContent(data);
     return data;
   }
 
@@ -96,6 +98,7 @@ function Home() {
     async function enviarIds() {
       try {
         await sendIdsToMongo(ids, controller.signal);
+
       } catch (error) {
         if (!controller.signal.aborted) {
           setLibraryError(error.message);
@@ -124,7 +127,8 @@ function Home() {
     return <p role="alert">{libraryError}</p>;
   }
 
-  console.log(library)
+  console.log(fullContent)
+
   return (
       <>
       <Header />
@@ -164,64 +168,31 @@ function Home() {
 
 
             {/*ACOMPANHANDO*/}
+                                                          {/*DAQUI*/}
             <ul className="cards-grid">
-              <li>
-                <article className="media-card">
-                  <div className="cover-wrapper">
-                    <a href="#" aria-label="Ver detalhes de Duna">
-                      <img src={bttf} alt="Capa"/>
-                    </a>
+              {fullContent.slice(0,3).map((item) => (
+                  <li key={item._id}>
+                    <article className="media-card">
+                      <div className="cover-wrapper">
+                        <a href="#" aria-label="Ver detalhes">
+                          <img src={item.poster} height={"200px"} alt="Capa"/>
+                        </a>
 
-                  </div>
+                      </div>
 
-                  <h3><a href="#">Filme</a></h3>
-                  <p>Filme · <time dateTime="ano">Data</time></p>
+                      <h3><a href="#">{item.type}</a></h3>
+                      <p>{item.type} · <time dateTime="ano">{item.date}</time></p>
 
-                  <ul className="tags" aria-label="Gêneros">
-                    <li>genero1</li>
-                    <li>genero2</li>
-                  </ul>
-                </article>
-              </li>
+                      <ul className="tags" aria-label="Gêneros">
+                        <li>{item.genres[0]}</li>
+                        <li>{item.genres[1]}</li>
+                        <li>{item.genres[2]}</li>
+                      </ul>
+                    </article>
+                  </li>
+              ))}
 
-              <li>
-                <article className="media-card">
-                  <div className="cover-wrapper">
-                    <a href="#" aria-label="Ver detalhes de Duna">
-                      <img src={bttf} alt="Capa"/>
-                    </a>
-
-                  </div>
-
-                  <h3><a href="#">Filme</a></h3>
-                  <p>Filme · <time dateTime="ano">Data</time></p>
-
-                  <ul className="tags" aria-label="Gêneros">
-                    <li>genero1</li>
-                    <li>genero2</li>
-                  </ul>
-                </article>
-              </li>
-
-              <li>
-                <article className="media-card">
-                  <div className="cover-wrapper">
-                    <a href="#" aria-label="Ver detalhes de Duna">
-                      <img src={bttf} alt="Capa"/>
-                    </a>
-
-                  </div>
-
-                  <h3><a href="#">Filme</a></h3>
-                  <p>Filme · <time dateTime="ano">Data</time></p>
-
-                  <ul className="tags" aria-label="Gêneros">
-                    <li>genero1</li>
-                    <li>genero2</li>
-                  </ul>
-                </article>
-              </li>
-
+                                                          {/*ATE AQUI*/}
 
             </ul>
           </section>
