@@ -1,0 +1,49 @@
+.perfil {
+    position: relative;
+    margin-left: auto;
+}
+
+.perfil-botao {
+    border: none;
+    background: transparent;
+    font-size: 26px;
+    cursor: pointer;
+}
+
+.perfil-janela {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    z-index: 1000;
+
+    width: 240px;
+    max-width: calc(100vw - 32px);
+    box-sizing: border-box;
+    padding: 16px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    box-shadow: 0 12px 35px rgb(0 0 0 / 15%);
+}
+
+.perfil-janela a,
+.perfil-janela button {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    margin-top: 8px;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #172b40;
+    font: inherit;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.perfil-janela a:hover,
+.perfil-janela button:hover {
+    background: #f3f4f6;
+}

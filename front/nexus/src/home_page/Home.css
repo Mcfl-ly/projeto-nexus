@@ -101,6 +101,8 @@ body {
     display: grid;
     grid-template-columns: 1.5fr 1fr;
     gap: 16px;
+    margin-top: 16px;
+
 }
 
 .panel {
@@ -111,6 +113,9 @@ body {
     border-radius: 16px;
 }
 
+.media-card .lancamento {
+    margin: 10px 0;
+}
 .panel-header {
     display: flex;
     align-items: center;

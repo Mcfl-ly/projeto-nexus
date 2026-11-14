@@ -1,31 +1,43 @@
 import "../home_page/Home.css"
-import user_icon from "../assets/user_icon.png";
 import claquete from "../assets/claquete-roxa.png";
 import controle from "../assets/controle-azul.png";
 import livro from "../assets/livro-vermelho.png";
 import casinha from "../assets/casinha-verde.png";
 import { Link } from "react-router-dom";
-import {useState} from "react";
+import { useEffect, useState } from "react";
+import User from "../user_min_window/User.jsx"
 
-function Header() {
-    const controller = new AbortController();
-    async function checkSession() {
-        try {
-            const response = await fetch("http://localhost:8000/users/me", {
 
-                credentials: "include",
-                signal: controller.signal,
-            });
+export default function Header() {
+    const [userName, setUserName] = useState(null);
 
-            if (response.ok) {
+    useEffect(() => {
+        const controller = new AbortController();
+
+        async function checkSession() {
+            try {
+                const response = await fetch("http://localhost:8000/users/me", {
+                    credentials: "include",
+                    signal: controller.signal,
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Erro ao buscar usuário: ${response.status}`);
+                }
+
                 const user = await response.json();
-                console.log(user);
+                setUserName(user.username);
+            } catch (error) {
+                if (error.name !== "AbortError") {
+                    console.error(error);
+                }
             }
-        } catch (error) {
-            console.log(error);
         }
 
-    }
+        checkSession();
+
+        return () => controller.abort();
+    }, []);
 
 
     return (
@@ -62,12 +74,11 @@ function Header() {
 
             <div className="user-actions">
 
-                <button className="user_button" onClick={checkSession} type="button" aria-label="Abrir menu do perfil">
-                    <img src={user_icon} alt="" width="36" height="36"/>
-                </button>
+                {/*<button className="user_button" onClick={checkSession} type="button" aria-label="Abrir menu do perfil">*/}
+                {/*    <img src={user_icon} alt="" width="36" height="36"/>*/}
+                {/*</button>*/}
+                <User usuario={userName} />
             </div>
         </header>
     )
 }
-
-export default Header;

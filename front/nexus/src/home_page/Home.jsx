@@ -1,15 +1,7 @@
 import "./Home.css"
 import Header from "../Components/Header.jsx"
-import Movies from "../movies_page/Movies.jsx"
-import user_icon from "../assets/user_icon.png";
-import claquete from "../assets/claquete-roxa.png";
-import controle from "../assets/controle-azul.png";
-import livro from "../assets/livro-vermelho.png";
-import casinha from "../assets/casinha-verde.png";
-import bttf from "../assets/bttf.jpg";
 import { Link, useOutletContext } from "react-router-dom";
 import {useEffect, useState} from "react";
-
 
 
 function Home() {
@@ -140,30 +132,30 @@ function Home() {
           <p>Filmes, jogos e livros. Tudo no seu ritmo.</p>
         </section>
 
-        <section className="collection-summary" aria-labelledby="summary-title">
-          <h2 id="summary-title" className="sr-only">Resumo do acervo</h2>
+        {/*<section className="collection-summary" aria-labelledby="summary-title">*/}
+        {/*  <h2 id="summary-title" className="sr-only">Resumo do acervo</h2>*/}
 
-          <ul className="summary-grid">
-            <li><a className="bloco" href="/filmes">
-              <img src={claquete} width="30" height="30" alt="claquete"/>
-              Filmes <strong>28</strong></a></li>
+        {/*  <ul className="summary-grid">*/}
+        {/*    <li><a className="bloco" href="/filmes">*/}
+        {/*      <img src={claquete} width="30" height="30" alt="claquete"/>*/}
+        {/*      Filmes <strong>28</strong></a></li>*/}
 
-            <li><a className="bloco" href="/jogos">
-              <img src={controle} width="30" height="30" alt="claquete"/>
-              Jogos <strong>16</strong></a></li>
+        {/*    <li><a className="bloco" href="/jogos">*/}
+        {/*      <img src={controle} width="30" height="30" alt="claquete"/>*/}
+        {/*      Jogos <strong>16</strong></a></li>*/}
 
-            <li><a className="bloco" href="/livros">
-              <img src={livro} width="30" height="30" alt="claquete"/>
-              Livros <strong>24</strong></a></li>
+        {/*    <li><a className="bloco" href="/livros">*/}
+        {/*      <img src={livro} width="30" height="30" alt="claquete"/>*/}
+        {/*      Livros <strong>24</strong></a></li>*/}
 
-          </ul>
-        </section>
+        {/*  </ul>*/}
+        {/*</section>*/}
 
         <div className="dashboard-grid">
           <section className="panel" aria-labelledby="watching-title">
             <header className="panel-header">
               <h2 id="watching-title">Acompanhando agora</h2>
-              <a href="/acompanhando">Ver todos <span aria-hidden="true">→</span></a>
+              {/*<a href="/acompanhando">Ver todos <span aria-hidden="true">→</span></a>*/}
             </header>
 
 
@@ -180,8 +172,8 @@ function Home() {
 
                       </div>
 
-                      <h3><a href="#">{item.type}</a></h3>
-                      <p>{item.type} · <time dateTime="ano">{item.date}</time></p>
+                      {/*<h3><a href="#">{item.type}</a></h3>*/}
+                      <p className="lancamento">{item.type} · <time dateTime="ano">{item.date}</time></p>
 
                       <ul className="tags" aria-label="Gêneros">
                         <li>{item.genres[0]}</li>
