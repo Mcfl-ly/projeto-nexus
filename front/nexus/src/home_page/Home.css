@@ -261,7 +261,62 @@ body {
 }
 
 
+.movie-list {
+    --altura-card: 150px;
+    --espaco-cards: 12px;
 
+    display: flex;
+    flex-direction: column;
+    gap: var(--espaco-cards);
+
+    max-height: calc(
+            var(--altura-card) * 4 + var(--espaco-cards) * 3
+    );
+
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    padding: 0 8px 0 0;
+    margin: 0;
+    list-style: none;
+
+    scrollbar-width: thin;
+    scrollbar-color: #666 transparent;
+}
+
+.movie-list > li {
+    height: var(--altura-card);
+    flex-shrink: 0;
+}
+
+.movie-list .movie-card {
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.movie-list .movie-poster {
+    height: 100%;
+    min-height: 0;
+}
+
+.movie-list .movie-poster img {
+    height: 100%;
+    width: 100%;
+    object-fit: cover;
+}
+
+/* Personalização para Chrome, Edge e Safari. */
+.movie-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.movie-list::-webkit-scrollbar-thumb {
+    background: #666;
+    border-radius: 8px;
+}
+
+.movie-list::-webkit-scrollbar-track {
+    background: transparent;
+}
 
 
 

@@ -1,13 +1,10 @@
+/* Movies.css */
+
 .games-content {
     max-width: 1200px;
     margin: 0 auto;
     padding: 32px 24px 48px;
     color: #10213a;
-}
-
-.games-content,
-.games-content * {
-    box-sizing: border-box;
 }
 
 /* Título e botão */
@@ -33,11 +30,11 @@
 }
 
 .add-game-button {
-    padding: 12px 18px;
     border: none;
     border-radius: 10px;
+    padding: 12px 18px;
     background: #4ecde6;
-    color: #fff;
+    color: white;
     font: inherit;
     font-weight: 600;
     white-space: nowrap;
@@ -52,27 +49,27 @@
 
 .games-columns {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
 }
 
 .game-column {
     min-width: 0;
-    padding: 12px;
+    padding: 14px;
     border: 1px solid #e9e9ee;
     border-radius: 16px;
     background: #fff;
 }
 
-.game-column-header {
+.column-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: 12px;
     padding: 0 2px 14px;
 }
 
-.game-column-header h2 {
+.column-header h2 {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -80,22 +77,18 @@
     font-size: 17px;
 }
 
-.game-status-dot {
+.status-dot {
     width: 12px;
     height: 12px;
     flex-shrink: 0;
     border-radius: 50%;
 }
 
-.game-status-pending {
+.status-pending {
     background: #ff4d57;
 }
 
-.game-status-playing {
-    background: #ffb000;
-}
-
-.game-status-completed {
+.status-watched {
     background: #00bf75;
 }
 
@@ -104,8 +97,7 @@
     place-items: center;
     min-width: 26px;
     height: 26px;
-    padding: 0 6px;
-    border-radius: 20px;
+    border-radius: 50%;
     background: #f0f1f3;
     font-size: 12px;
     font-weight: 700;
@@ -125,52 +117,53 @@
 .game-card {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
+    gap: 14px;
     padding: 10px;
-    border: 1px solid #eeeef2;
+    border: 1px solid #eeeeF2;
     border-radius: 12px;
     background: #fff;
 }
 
-.game-cover {
+.game-poster {
     display: grid;
     place-items: center;
     flex-shrink: 0;
-    width: 72px;
-    height: 100px;
+    width: 90px;
+    height: 120px;
     overflow: hidden;
     border-radius: 7px;
-    background: #fff0f1;
-    color: #b34a55;
+    background: #f0eafa;
+    color: #4ecde6;
     text-align: center;
     font-size: 12px;
 }
 
-img.game-cover,
-.game-cover img {
+/* Funciona se a capa for um <img> ou estiver dentro de uma div. */
+img.game-poster,
+.game-poster img {
     display: block;
-    width: 72px;
-    height: 100px;
+    width: 90px;
+    height: 120px;
     object-fit: cover;
 }
 
 .game-info {
     flex: 1;
     min-width: 0;
-    padding-top: 5px;
+    padding-top: 6px;
 }
 
 .game-info h3 {
     margin: 0 0 6px;
-    font-size: 15px;
+    font-size: 16px;
     line-height: 1.3;
     overflow-wrap: anywhere;
 }
 
-.game-platforms {
+.game-year {
     margin: 0 0 10px;
     color: #64748b;
-    font-size: 12px;
+    font-size: 13px;
 }
 
 /* Gêneros */
@@ -198,14 +191,14 @@ img.game-cover,
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
 }
 
 .game-actions button {
     display: grid;
     place-items: center;
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     padding: 0;
     border: none;
     border-radius: 6px;
@@ -216,7 +209,7 @@ img.game-cover,
 }
 
 .game-actions button:hover {
-    background: #fff0f1;
+    background: #f5f0fc;
 }
 
 .game-actions button[aria-pressed="true"] {
@@ -226,24 +219,18 @@ img.game-cover,
 .game-rating {
     margin: 10px 0 0;
     color: #ffad00;
-    font-size: 16px;
+    font-size: 18px;
     letter-spacing: 1px;
 }
 
 .games-content button:focus-visible {
-    outline: 3px solid #ff3545;
+    outline: 3px solid #4ecde6;
     outline-offset: 3px;
 }
 
-/* Telas menores */
+/* Celular */
 
-@media (max-width: 1000px) {
-    .games-columns {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
-
-@media (max-width: 700px) {
+@media (max-width: 768px) {
     .games-content {
         padding: 24px 16px;
     }
@@ -265,13 +252,12 @@ img.game-cover,
 @media (max-width: 400px) {
     .game-card {
         gap: 8px;
-        padding: 8px;
     }
 
-    .game-cover,
-    img.game-cover,
-    .game-cover img {
-        width: 60px;
-        height: 85px;
+    .game-poster,
+    img.game-poster,
+    .game-poster img {
+        width: 65px;
+        height: 95px;
     }
 }
