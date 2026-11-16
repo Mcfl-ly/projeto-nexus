@@ -352,3 +352,40 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
+/* Duas linhas de tres favoritos; os demais ficam acessiveis por rolagem. */
+.favorites-scroll {
+    --favorite-row-height: 240px;
+    --favorite-visible-rows: 2;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-rows: var(--favorite-row-height);
+    gap: 12px;
+    max-height: calc(var(--favorite-row-height) * var(--favorite-visible-rows) + 12px * (var(--favorite-visible-rows) - 1));
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: #94a3b8 transparent;
+    padding-right: 8px;
+    overscroll-behavior-y: contain;
+}
+.favorites-scroll > li { min-width: 0; }
+.favorites-scroll .media-card { height: 100%; }
+.favorites-scroll .cover-wrapper { height: 160px; aspect-ratio: auto; }
+.favorites-scroll .media-card h3 {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    line-height: 20px;
+    height: 40px;
+    overflow-wrap: anywhere;
+}
+.favorites-scroll .media-card > p { font-size: 13px; line-height: 18px; }
+.favorites-scroll:focus-visible { outline: 3px solid #9333ea; outline-offset: 4px; border-radius: 8px; }
+.favorites-scroll::-webkit-scrollbar { width: 6px; }
+.favorites-scroll::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 8px; }
+.favorites-scroll::-webkit-scrollbar-track { background: transparent; }
+@media (max-width: 600px) {
+    .favorites-scroll { grid-template-columns: repeat(2, minmax(0, 1fr)); --favorite-visible-rows: 3; }
+}

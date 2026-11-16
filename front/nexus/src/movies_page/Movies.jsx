@@ -1,3 +1,5 @@
+import FavoriteButton from "../Components/FavoriteButton.jsx";
+import AddContentModal from "../Components/AddContentModal.jsx";
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import "./Movies.css";
@@ -5,6 +7,8 @@ import Header from "../components/Header.jsx";
 import useLibrary from "../hooks/useLibrary";
 
 export default function Movies() {
+    const [adding, setAdding] = useState(false);
+    const [addMessage, setAddMessage] = useState("");
 
     const [excluindo, setExcluindo] = useState({});
     const [idsExcluidos, setIdsExcluidos] = useState([]);
@@ -14,6 +18,8 @@ export default function Movies() {
     const user = context?.user;
 
     const {
+        library,
+        reloadLibrary,
         fullContent,
         libraryError,
         loadingLibrary,
@@ -150,7 +156,7 @@ export default function Movies() {
         ])
     );
 
-    const filmes = (user.content ?? [])
+    const filmes = library.map((row) => ({ id: row[0], mongo_id: row[2], status: row[4], rating: row[5], favorite: row[9] }))
         .filter((registro) => !idsExcluidos.includes(registro.id))
         .flatMap((registro) => {
             const conteudo = conteudosPorId.get(
@@ -167,6 +173,7 @@ export default function Movies() {
                 statusUsuario:
                     statusAtualizados[registro.id] ?? registro.status,
                 notaUsuario: registro.rating,
+                favorite: registro.favorite,
             }];
         });
 
@@ -192,6 +199,8 @@ export default function Movies() {
     return (
         <>
             <Header />
+            {adding && <AddContentModal type="movie" onClose={() => setAdding(false)} onAdded={() => { setAdding(false); setAddMessage("Conteúdo adicionado à biblioteca."); reloadLibrary(); }} />}
+            {addMessage && <p role="status" style={{ maxWidth: 1200, margin: "16px auto", padding: "0 24px", color: "#087443" }}>{addMessage}</p>}
 
             <div className="movies-page">
                 <main className="movies-content">
@@ -206,11 +215,12 @@ export default function Movies() {
                             </p>
                         </div>
 
-                        <button className="add-movie-button" type="button">
+                        <button className="add-movie-button" type="button" onClick={() => { setAddMessage(""); setAdding(true); }}>
                             + Adicionar filme
                         </button>
                     </section>
 
+                    {erroExclusao && <p role="alert">{erroExclusao}</p>}
                     {erroStatus && (
                         <p role="alert">{erroStatus}</p>
                     )}
@@ -257,7 +267,7 @@ export default function Movies() {
                                                     <article className="movie-card">
                                                         <div className="movie-poster">
                                                             <img
-                                                                src={filme.poster}
+                                                                src={filme.poster ?? filme.img_url}
                                                                 alt={`Capa de ${filme.title}`}
                                                             />
                                                         </div>
@@ -266,7 +276,7 @@ export default function Movies() {
                                                             <h3>{filme.title}</h3>
 
                                                             <p className="movie-year">
-                                                                {filme.date?.slice(0, 4)}
+                                                                {(filme.date ?? filme.release_date)?.slice(0, 4)}
                                                             </p>
 
                                                             <ul
@@ -284,6 +294,7 @@ export default function Movies() {
                                                         </div>
 
                                                         <div className="movie-actions">
+                                                                <FavoriteButton id={filme.registroId} title={filme.title} favorite={filme.favorite} />
                                                             <button
                                                                 type="button"
                                                                 onClick={() => excluirConteudo(filme.registroId)}

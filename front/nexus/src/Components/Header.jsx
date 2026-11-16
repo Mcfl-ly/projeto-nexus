@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import User from "../user_min_window/User.jsx"
 
 
-export default function Header() {
+export default function Header({ username }) {
     const [userName, setUserName] = useState(null);
 
     useEffect(() => {
@@ -77,7 +77,7 @@ export default function Header() {
                 {/*<button className="user_button" onClick={checkSession} type="button" aria-label="Abrir menu do perfil">*/}
                 {/*    <img src={user_icon} alt="" width="36" height="36"/>*/}
                 {/*</button>*/}
-                <User usuario={userName} />
+                <User usuario={username ?? userName} />
             </div>
         </header>
     )

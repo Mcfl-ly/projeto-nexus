@@ -56,5 +56,5 @@ export default function ProtectedRoute() {
         return <Navigate to="/login" replace />;
     }
 
-    return <Outlet context={{ user }}/>;
+    return <Outlet context={{ user, setUser }}/>;
 }

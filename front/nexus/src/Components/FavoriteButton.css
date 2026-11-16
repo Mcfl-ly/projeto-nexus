@@ -1,0 +1,11 @@
+.favorite-control { position: relative; }
+.favorite-control .favorite-button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid #e5e7eb; border-radius: 50%; background: white; color: #64748b; font-size: 25px; cursor: pointer; }
+.favorite-control .favorite-button[aria-pressed="true"] { color: #dc315d; background: #fff0f4; border-color: #fbc4d3; }
+.favorite-control .favorite-button:hover { background: #fff0f4; color: #dc315d; }
+.favorite-control .favorite-button:focus-visible { outline: 3px solid #dc315d; outline-offset: 3px; }
+.favorite-control .favorite-button:disabled { opacity: .6; cursor: wait; }
+.favorite-error { position: absolute; top: 100%; right: 0; z-index: 2; width: 190px; padding: 10px; border: 1px solid #fbc4d3; border-radius: 8px; background: #fff0f4; color: #a31b1b; font-size: 12px; }
+.favorite-cover { position: relative; }
+.favorite-cover > .favorite-control { position: absolute; top: 8px; right: 8px; }
+.favorite-cover .favorite-button { position: static; }
+.favorite-placeholder { display: grid; place-items: center; height: 100%; background: #f1f2f4; color: #64748b; }

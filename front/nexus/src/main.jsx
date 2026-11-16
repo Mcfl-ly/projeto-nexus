@@ -1,3 +1,4 @@
+import Profile from "./profile_page/Profile.jsx";
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import Home from './home_page/Home.jsx'
@@ -21,6 +22,7 @@ createRoot(document.getElementById('root')).render(
               <Route path="/filmes" element={<Movies />} />
               <Route path="/jogos" element={<Games />} />
               <Route path="/livros" element={<Books />} />
+              <Route path="/perfil" element={<Profile />} />
               </Route>
           </Routes>
       </BrowserRouter>

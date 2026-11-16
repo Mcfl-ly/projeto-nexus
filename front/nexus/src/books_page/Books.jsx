@@ -1,3 +1,5 @@
+import FavoriteButton from "../Components/FavoriteButton.jsx";
+import AddContentModal from "../Components/AddContentModal.jsx";
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import Header from "../components/Header.jsx";
@@ -32,6 +34,8 @@ const COLUNAS = [
 ];
 
 export default function Books() {
+    const [adding, setAdding] = useState(false);
+    const [addMessage, setAddMessage] = useState("");
 
 
     const [excluindo, setExcluindo] = useState({});
@@ -43,6 +47,8 @@ export default function Books() {
     const user = context?.user;
 
     const {
+        library,
+        reloadLibrary,
         fullContent,
         libraryError,
         loadingLibrary,
@@ -173,7 +179,7 @@ export default function Books() {
         ])
     );
 
-    const livros = (user.content ?? [])
+    const livros = library.map((row) => ({ id: row[0], mongo_id: row[2], status: row[4], rating: row[5], favorite: row[9] }))
         .filter((registro) => !idsExcluidos.includes(registro.id))
         .flatMap((registro) => {
             const conteudo = conteudosPorId.get(
@@ -190,12 +196,15 @@ export default function Books() {
                 statusUsuario:
                     statusAtualizados[registro.id] ?? registro.status,
                 notaUsuario: registro.rating,
+                favorite: registro.favorite,
             }];
         });
 
     return (
         <>
             <Header />
+            {adding && <AddContentModal type="book" onClose={() => setAdding(false)} onAdded={() => { setAdding(false); setAddMessage("Conteúdo adicionado à biblioteca."); reloadLibrary(); }} />}
+            {addMessage && <p role="status" style={{ maxWidth: 1200, margin: "16px auto", padding: "0 24px", color: "#087443" }}>{addMessage}</p>}
 
             <div className="books-page">
                 <main className="books-content">
@@ -210,11 +219,12 @@ export default function Books() {
                             </p>
                         </div>
 
-                        <button className="add-book-button" type="button">
+                        <button className="add-book-button" type="button" onClick={() => { setAddMessage(""); setAdding(true); }}>
                             + Adicionar livro
                         </button>
                     </section>
 
+                    {erroExclusao && <p role="alert">{erroExclusao}</p>}
                     {erroStatus && (
                         <p role="alert">{erroStatus}</p>
                     )}
@@ -258,9 +268,9 @@ export default function Books() {
                                                     <li key={livro.registroId}>
                                                         <article className="book-card">
                                                             <div className="book-cover">
-                                                                {livro.poster ? (
+                                                                {(livro.poster ?? livro.img_url) ? (
                                                                     <img
-                                                                        src={livro.poster}
+                                                                        src={livro.poster ?? livro.img_url}
                                                                         alt={`Capa de ${livro.title}`}
                                                                     />
                                                                 ) : (
@@ -273,7 +283,7 @@ export default function Books() {
 
                                                                 <p className="book-author">
                                                                     {livro.author ??
-                                                                        livro.authors?.join(", ")}
+                                                                        (livro.author_name ?? livro.authors)?.join(", ")}
                                                                 </p>
 
                                                                 <ul
@@ -297,6 +307,7 @@ export default function Books() {
                                                             </div>
 
                                                             <div className="book-actions">
+                                                                <FavoriteButton id={livro.registroId} title={livro.title} favorite={livro.favorite} />
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => excluirConteudo(livro.registroId)}

@@ -1,3 +1,5 @@
+import FavoriteButton from "../Components/FavoriteButton.jsx";
+import AddContentModal from "../Components/AddContentModal.jsx";
 import Header from "../components/Header.jsx";
 import {useOutletContext} from "react-router-dom";
 import useLibrary from "../hooks/useLibrary.js";
@@ -8,6 +10,8 @@ import "./Games.css";
 
 
 export default function Games() {
+    const [adding, setAdding] = useState(false);
+    const [addMessage, setAddMessage] = useState("");
 
     const [excluindo, setExcluindo] = useState({});
     const [idsExcluidos, setIdsExcluidos] = useState([]);
@@ -18,6 +22,8 @@ export default function Games() {
     const user = context?.user;
 
     const {
+        library,
+        reloadLibrary,
         fullContent,
         libraryError,
         loadingLibrary,
@@ -154,7 +160,7 @@ export default function Games() {
         ])
     );
 
-    const jogos = (user.content ?? [])
+    const jogos = library.map((row) => ({ id: row[0], mongo_id: row[2], status: row[4], rating: row[5], favorite: row[9] }))
         .filter((registro) => !idsExcluidos.includes(registro.id))
         .flatMap((registro) => {
             const conteudo = conteudosPorId.get(
@@ -171,6 +177,7 @@ export default function Games() {
                 statusUsuario:
                     statusAtualizados[registro.id] ?? registro.status,
                 notaUsuario: registro.rating,
+                favorite: registro.favorite,
             }];
         });
 
@@ -196,6 +203,8 @@ export default function Games() {
     return (
         <>
             <Header />
+            {adding && <AddContentModal type="game" onClose={() => setAdding(false)} onAdded={() => { setAdding(false); setAddMessage("Conteúdo adicionado à biblioteca."); reloadLibrary(); }} />}
+            {addMessage && <p role="status" style={{ maxWidth: 1200, margin: "16px auto", padding: "0 24px", color: "#087443" }}>{addMessage}</p>}
 
             <div className="games-page">
                 <main className="games-content">
@@ -210,11 +219,12 @@ export default function Games() {
                             </p>
                         </div>
 
-                        <button className="add-game-button" type="button">
+                        <button className="add-game-button" type="button" onClick={() => { setAddMessage(""); setAdding(true); }}>
                             + Adicionar jogo
                         </button>
                     </section>
 
+                    {erroExclusao && <p role="alert">{erroExclusao}</p>}
                     {erroStatus && (
                         <p role="alert">{erroStatus}</p>
                     )}
@@ -261,7 +271,7 @@ export default function Games() {
                                                     <article className="game-card">
                                                         <div className="game-poster">
                                                             <img
-                                                                src={jogo.poster}
+                                                                src={jogo.poster ?? jogo.img_url}
                                                                 alt={`Capa de ${jogo.title}`}
                                                             />
                                                         </div>
@@ -270,7 +280,7 @@ export default function Games() {
                                                             <h3>{jogo.title}</h3>
 
                                                             <p className="game-year">
-                                                                {jogo.date?.slice(0, 4)}
+                                                                {(jogo.release_date ?? jogo.date)?.slice(0, 4)}
                                                             </p>
 
                                                             <ul
@@ -288,6 +298,7 @@ export default function Games() {
                                                         </div>
 
                                                         <div className="game-actions">
+                                                                <FavoriteButton id={jogo.registroId} title={jogo.title} favorite={jogo.favorite} />
                                                             <button
                                                                 type="button"
                                                                 onClick={() => excluirConteudo(jogo.registroId)}

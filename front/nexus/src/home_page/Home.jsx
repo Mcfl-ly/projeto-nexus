@@ -1,3 +1,4 @@
+import FavoriteButton from "../Components/FavoriteButton.jsx";
 import "./Home.css";
 import Header from "../Components/Header.jsx";
 import { Link, useOutletContext } from "react-router-dom";
@@ -8,6 +9,8 @@ function Home() {
   const user = context?.user;
 
   const {
+    library,
+    reloadLibrary,
     fullContent,
     libraryError,
     loadingLibrary,
@@ -28,6 +31,14 @@ function Home() {
   if (libraryError) {
     return <p role="alert">{libraryError}</p>;
   }
+
+  const catalog = new Map(fullContent.map((item) => [String(item._id), item]));
+  const favorites = library.filter((row) => row[9] === true).flatMap((row) => {
+    const item = catalog.get(String(row[2]));
+    return item ? [{ ...item, registroId: row[0] }] : [];
+  });
+  const contentRoutes = { movie: "/filmes", game: "/jogos", book: "/livros" };
+  const contentLabels = { movie: "Filme", game: "Jogo", book: "Livro" };
 
   return (
       <>
@@ -85,27 +96,42 @@ function Home() {
             <section className="panel" aria-labelledby="favorites-title">
               <header className="panel-header">
                 <h2 id="favorites-title">Seus favoritos</h2>
-
-                <Link to="/favoritos">
-                  Ver todos <span aria-hidden="true">→</span>
-                </Link>
               </header>
 
-              <ul className="cards-grid"></ul>
+              {favorites.length === 0 ? (
+                <p>Seus favoritos aparecem aqui. Toque no coração de um filme, jogo ou livro.</p>
+              ) : (
+                <ul className="cards-grid favorites-scroll" tabIndex={0} aria-labelledby="favorites-title">
+                  {favorites.map((item) => (
+                    <li key={item.registroId}>
+                      <article className="media-card">
+                        <div className="cover-wrapper favorite-cover">
+                          <Link to={contentRoutes[item.type] ?? "/"} aria-label={"Ver " + item.title}>
+                            {(item.poster ?? item.img_url) ? <img src={item.poster ?? item.img_url} alt={"Capa de " + item.title} /> : <span className="favorite-placeholder">Sem capa</span>}
+                          </Link>
+                          <FavoriteButton id={item.registroId} title={item.title} favorite={true} onChanged={reloadLibrary} />
+                        </div>
+                        <h3><Link to={contentRoutes[item.type] ?? "/"}>{item.title}</Link></h3>
+                        <p>{contentLabels[item.type] ?? item.type}</p>
+                      </article>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
           </div>
 
-          <section className="panel recent" aria-labelledby="recent-title">
-            <header className="panel-header">
-              <h2 id="recent-title">Adicionados recentemente</h2>
+          {/*<section className="panel recent" aria-labelledby="recent-title">*/}
+          {/*  <header className="panel-header">*/}
+          {/*    <h2 id="recent-title">Adicionados recentemente</h2>*/}
 
-              <Link to="/recentes">
-                Ver todos <span aria-hidden="true">→</span>
-              </Link>
-            </header>
+          {/*    <Link to="/recentes">*/}
+          {/*      Ver todos <span aria-hidden="true">→</span>*/}
+          {/*    </Link>*/}
+          {/*  </header>*/}
 
-            <ul className="recent-grid"></ul>
-          </section>
+          {/*  <ul className="recent-grid"></ul>*/}
+          {/*</section>*/}
         </main>
       </>
   );

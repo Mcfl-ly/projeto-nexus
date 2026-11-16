@@ -4,7 +4,7 @@ import "./Register.css";
 
 export default function Register() {
     const [name, setName] = useState("");
-    const [email, setEmail] = useState("");
+    const [login, setLogin] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [error, setError] = useState("");
@@ -14,6 +14,7 @@ export default function Register() {
 
     async function handleSubmit(event) {
         event.preventDefault();
+        if (isSubmitting) return;
 
         setError("");
         setMessage("");
@@ -30,19 +31,19 @@ export default function Register() {
         setIsSubmitting(true);
 
         try {
-            // Exemplo: ajuste a URL para a sua rota de cadastro.
             const response = await fetch("http://localhost:8000/register", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    email: email.trim(),
+                    login: login.trim(),
                     password,
                     name: name.trim()
                 }),
             });
 
+            if (response.status === 409) throw new Error("Esse login já está em uso. Escolha outro.");
             if (!response.ok) {
                 throw new Error(`Não foi possível criar a conta (${response.status}).`);
             }
@@ -51,14 +52,11 @@ export default function Register() {
             setPassword("");
             setConfirmPassword("");
         } catch (error) {
-            setError(error.message);
+            setError(error instanceof TypeError ? "Não foi possível conectar à API." : error.message);
         } finally {
             setIsSubmitting(false);
         }
 
-        setMessage(
-            "Dados validados. Falta conectar à rota de cadastro do backend."
-        );
     }
 
     return (
@@ -88,6 +86,7 @@ export default function Register() {
                             type="text"
                             placeholder="Seu nome"
                             autoComplete="name"
+                            maxLength={100}
                             value={name}
                             onChange={(event) => setName(event.target.value)}
                             required
@@ -95,16 +94,20 @@ export default function Register() {
                     </div>
 
                     <div className="register-field">
-                        <label htmlFor="register-email">E-mail</label>
+                        <label htmlFor="register-login">Login</label>
 
                         <input
-                            id="register-email"
-                            name="email"
-                            type="email"
-                            placeholder="voce@exemplo.com"
-                            autoComplete="email"
-                            value={email}
-                            onChange={(event) => setEmail(event.target.value)}
+                            id="register-login"
+                            name="login"
+                            type="text"
+                            placeholder="seu_login"
+                            autoComplete="username"
+                            minLength={3}
+                            maxLength={50}
+                            pattern="[a-zA-Z0-9_.-]+"
+                            title="Use de 3 a 50 letras, números, pontos, hífens ou sublinhados, sem espaços."
+                            value={login}
+                            onChange={(event) => setLogin(event.target.value)}
                             required
                         />
                     </div>
@@ -117,6 +120,8 @@ export default function Register() {
                             name="password"
                             type="password"
                             placeholder="Crie uma senha"
+                            minLength={8}
+                            maxLength={64}
                             autoComplete="new-password"
                             value={password}
                             onChange={(event) => setPassword(event.target.value)}
@@ -152,8 +157,8 @@ export default function Register() {
                         </p>
                     )}
 
-                    <button className="register-submit" type="submit">
-                        Criar conta
+                    <button className="register-submit" type="submit" disabled={isSubmitting}>
+                        {isSubmitting ? "Criando conta…" : "Criar conta"}
                     </button>
 
                     <p className="register-message" role="status">

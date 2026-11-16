@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export default function useLibrary(userId) {
+    const [revision, setRevision] = useState(0);
+    const reloadLibrary = useCallback(() => setRevision((value) => value + 1), []);
     const [library, setLibrary] = useState([]);
     const [fullContent, setFullContent] = useState([]);
     const [libraryError, setLibraryError] = useState("");
@@ -66,7 +68,7 @@ export default function useLibrary(userId) {
 
                 if (!signal.aborted) {
                     setLibrary(libraryData);
-                    setFullContent(contentData);
+                    setFullContent(contentData.filter(Boolean));
                 }
             } catch (error) {
                 if (!signal.aborted) {
@@ -82,9 +84,10 @@ export default function useLibrary(userId) {
         carregarBiblioteca();
 
         return () => controller.abort();
-    }, [userId]);
+    }, [userId, revision]);
 
     return {
+        reloadLibrary,
         library,
         fullContent,
         libraryError,
