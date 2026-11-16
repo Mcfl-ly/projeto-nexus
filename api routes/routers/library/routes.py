@@ -2,7 +2,6 @@ from database import RequestConnection
 from typing import Annotated, Literal
 import json
 from routers.db_errors import handle_database_errors
-from deep_translator import GoogleTranslator
 from fastapi import FastAPI,Body, HTTPException, status, Response, Request, APIRouter, Depends
 import psycopg2
 import datetime
