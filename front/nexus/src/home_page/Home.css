@@ -8,7 +8,9 @@ body {
     color: #15283e;
     background: #f7f7f5;
 }
-
+.title-fav {
+    text-decoration: none;
+}
 .logo {
     text-decoration: none;
     color: black;
@@ -231,6 +233,8 @@ body {
     font-weight: bold;
 }
 
+
+
 .book_button {
     display: inline-flex;
     background-color: #ff8f8f;
@@ -388,4 +392,10 @@ body {
 .favorites-scroll::-webkit-scrollbar-track { background: transparent; }
 @media (max-width: 600px) {
     .favorites-scroll { grid-template-columns: repeat(2, minmax(0, 1fr)); --favorite-visible-rows: 3; }
+}
+
+/* O Link do React Router renderiza um <a> dentro do titulo. */
+.favorites-scroll .title-fav a {
+    text-decoration: none;
+    color: inherit;
 }

@@ -111,7 +111,7 @@ function Home() {
                           </Link>
                           <FavoriteButton id={item.registroId} title={item.title} favorite={true} onChanged={reloadLibrary} />
                         </div>
-                        <h3><Link to={contentRoutes[item.type] ?? "/"}>{item.title}</Link></h3>
+                        <h3 className="title-fav"><Link to={contentRoutes[item.type] ?? "/"}>{item.title}</Link></h3>
                         <p>{contentLabels[item.type] ?? item.type}</p>
                       </article>
                     </li>
