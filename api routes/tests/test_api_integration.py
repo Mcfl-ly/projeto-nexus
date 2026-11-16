@@ -7,7 +7,7 @@ from argon2 import PasswordHasher
 
 
 pytestmark = pytest.mark.integration
-DATA = {"email": "alice@example.com", "password": "SenhaValida123!", "name": "Alice"}
+DATA = {"login": "alice_example_com", "password": "SenhaValida123!", "name": "Alice"}
 
 
 def register_and_login(api):
@@ -30,7 +30,7 @@ def test_register_login_profile_end_to_end(real_api):
     register_and_login(api)
     response = api.client.get("/users/me")
     assert response.status_code == 200
-    assert response.json()["email"] == DATA["email"]
+    assert response.json()["login"] == DATA["login"]
     assert "password" not in response.json()
     rows = fetch(api, "SELECT token, revoked FROM refreshtoken")
     assert len(rows) == 1 and rows[0][1] is False
@@ -42,7 +42,7 @@ def test_duplicate_register_does_not_poison_next_request(real_api):
     assert api.client.post("/register", json=DATA).status_code == 200
     duplicate = api.client.post("/register", json=DATA)
     assert duplicate.status_code == 409
-    assert api.client.post("/register", json={**DATA, "email": "bob@example.com"}).status_code == 200
+    assert api.client.post("/register", json={**DATA, "login": "bob_example_com"}).status_code == 200
     assert len(fetch(api, "SELECT id FROM users")) == 2
 
 
@@ -50,7 +50,7 @@ def test_username_update_persists(real_api):
     api = real_api
     register_and_login(api)
     assert api.client.patch("/users/me", json={"username": "Alice Nova"}).status_code == 200
-    assert fetch(api, "SELECT name FROM users WHERE email=%s", (DATA["email"],)) == [("Alice Nova",)]
+    assert fetch(api, "SELECT name FROM users WHERE login=%s", (DATA["login"],)) == [("Alice Nova",)]
 
 
 def test_password_change_rejects_old_and_accepts_new(real_api):
@@ -99,7 +99,7 @@ def test_account_deletion_removes_related_records(real_api):
     api = real_api
     register_and_login(api)
     with api.connection.cursor() as cursor:
-        cursor.execute("INSERT INTO userlibrary (user_id, content_id, name) SELECT id, 'mongo-test', 'Duna' FROM users WHERE email=%s", (DATA["email"],))
+        cursor.execute("INSERT INTO userlibrary (user_id, content_id, name) SELECT id, 'mongo-test', 'Duna' FROM users WHERE login=%s", (DATA["login"],))
     api.connection.commit()
     assert api.client.delete("/users/me/delete").status_code == 200
     for table in ("users", "refreshtoken", "userlibrary"):
@@ -110,7 +110,7 @@ def test_account_deletion_removes_related_records(real_api):
 def test_library_owner_isolation_and_crud(real_api, access_token):
     api = real_api
     assert api.client.post("/register", json=DATA).status_code == 200
-    assert api.client.post("/register", json={**DATA, "email": "bob@example.com"}).status_code == 200
+    assert api.client.post("/register", json={**DATA, "login": "bob_example_com"}).status_code == 200
     alice, bob = [row[0] for row in fetch(api, "SELECT id FROM users ORDER BY id")]
     with api.connection.cursor() as cursor:
         cursor.execute("INSERT INTO userlibrary (user_id,content_id,name,status,rating) VALUES (%s,'mongo-test','Duna','Quero Ler',2) RETURNING id", (alice,))

@@ -32,11 +32,11 @@ def test_mutations_require_authentication(api, method, route, body):
 
 def test_profile_returns_user_without_password(logged_api):
     api = logged_api
-    api.db.users.cursor.return_value.fetchone.return_value = (1, "a@example.com", "private-hash", "Alice", datetime.date(2026, 1, 1))
+    api.db.users.cursor.return_value.fetchone.return_value = (1, "a_example_com", "private-hash", "Alice", datetime.date(2026, 1, 1))
     api.db.users.cursor.return_value.fetchall.return_value = []
     response = api.client.get("/users/me")
     assert response.status_code == 200
-    assert response.json() == {"email": "a@example.com", "username": "Alice", "created_at": "2026-01-01", "content": []}
+    assert response.json() == {"id": 1, "login": "a_example_com", "username": "Alice", "created_at": "2026-01-01", "content": []}
     assert "private-hash" not in response.text
     assert all(call.args[1] == ("1",) for call in api.db.users.cursor.return_value.execute.call_args_list)
 
@@ -49,7 +49,7 @@ def test_profile_missing_user_is_not_server_error(logged_api):
 
 def test_profile_content_type_uses_content_type_column(logged_api):
     api = logged_api
-    api.db.users.cursor.return_value.fetchone.return_value = (1, "a@example.com", "hash", "Alice", datetime.date.today())
+    api.db.users.cursor.return_value.fetchone.return_value = (1, "a_example_com", "hash", "Alice", datetime.date.today())
     api.db.users.cursor.return_value.fetchall.return_value = [(1, 1, "mongo-id", "Duna", "Quero Ler", None, datetime.date.today(), "OL123", "book")]
     response = api.client.get("/users/me")
     assert response.status_code == 200

@@ -1,3 +1,4 @@
+import { apiUrl } from "../api.js";
 import { useEffect, useRef, useState } from "react";
 import "./User.css";
 
@@ -33,7 +34,7 @@ export default function User({ usuario }) {
 
     async function logout() {
         try {
-            const response = await fetch("http://localhost:8000/logout", {
+            const response = await fetch(apiUrl("/logout"), {
                 method: "POST",
                 credentials: "include",
             });

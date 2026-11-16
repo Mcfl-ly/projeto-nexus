@@ -1,0 +1,33 @@
+# Creates only one free web service; databases are configured separately.
+services:
+  - type: web
+    name: nexus
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: COOKIE_SAMESITE
+        value: lax
+      - key: DATABASE_URL
+        sync: false
+      - key: CONNECTION_STRING
+        sync: false
+      - key: DATABASE
+        value: nexus
+      - key: COLECAO
+        value: contents
+      - key: TMDB_KEY
+        sync: false
+      - key: TWITCH_CLIENT_ID
+        sync: false
+      - key: TWITCH_CLIENT_SECRET
+        sync: false

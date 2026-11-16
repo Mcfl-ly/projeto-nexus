@@ -1,0 +1,15 @@
+.git
+**/node_modules
+**/dist
+**/.venv
+**/venv
+**/__pycache__
+**/.pytest_cache
+**/.idea
+**/.env
+**/.env.*
+db_backup
+modelos
+modelo front
+originais/*.docx
+originais/*.psd

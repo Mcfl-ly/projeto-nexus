@@ -1,10 +1,11 @@
+import { apiUrl } from "../api.js";
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import Header from "../Components/Header.jsx";
 import "./Profile.css";
 
 async function updateProfile(path, body) {
-    const response = await fetch("http://localhost:8000" + path, {
+    const response = await fetch(apiUrl("") + path, {
         method: "PATCH", credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -36,7 +37,7 @@ export default function Profile() {
         const controller = new AbortController();
         async function loadTotal() {
             try {
-                const response = await fetch("http://localhost:8000/library", { credentials: "include", signal: controller.signal });
+                const response = await fetch(apiUrl("/library"), { credentials: "include", signal: controller.signal });
                 if (!response.ok) throw new Error("Não foi possível carregar a quantidade de conteúdos.");
                 const library = await response.json();
                 if (!controller.signal.aborted) { setTotal(library.length); setTotalError(""); }

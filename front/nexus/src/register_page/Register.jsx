@@ -1,3 +1,4 @@
+import { apiUrl } from "../api.js";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import "./Register.css";
@@ -31,7 +32,7 @@ export default function Register() {
         setIsSubmitting(true);
 
         try {
-            const response = await fetch("http://localhost:8000/register", {
+            const response = await fetch(apiUrl("/register"), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

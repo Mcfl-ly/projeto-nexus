@@ -9,7 +9,7 @@ from pymongo.errors import ServerSelectionTimeoutError
 
 
 @pytest.mark.parametrize("area,method,route,body", [
-    ("auth", "post", "/login", {"email": "a@example.com", "password": "ValidPassword123"}),
+    ("auth", "post", "/login", {"login": "a_example_com", "password": "ValidPassword123"}),
     ("auth", "post", "/logout", None),
     ("users", "get", "/users/me", None),
     ("users", "patch", "/users/me", {"username": "Novo"}),
@@ -30,9 +30,9 @@ def test_database_errors_are_recoverable(logged_api, area, method, route, body):
 
 
 def test_login_commit_error_is_not_invalid_password(api):
-    api.db.auth.cursor.return_value.fetchone.return_value = (1, "a@example.com", PasswordHasher().hash("ValidPassword123"), "Nome", datetime.date.today())
+    api.db.auth.cursor.return_value.fetchone.return_value = (1, "a_example_com", PasswordHasher().hash("ValidPassword123"), "Nome", datetime.date.today())
     api.db.auth.commit.side_effect = psycopg2.OperationalError("commit failed")
-    response = api.client.post("/login", json={"email": "a@example.com", "password": "ValidPassword123"})
+    response = api.client.post("/login", json={"login": "a_example_com", "password": "ValidPassword123"})
     assert response.status_code == 503
     assert "set-cookie" not in response.headers
     api.db.auth.rollback.assert_called_once()
@@ -115,7 +115,7 @@ def test_migration_is_idempotent_and_preserves_existing_rows(postgres_database):
     with connection.cursor() as cursor:
         # Simula o schema anterior sem as duas colunas.
         cursor.execute("ALTER TABLE userlibrary DROP COLUMN external_api_id, DROP COLUMN content_type")
-        cursor.execute("INSERT INTO users (email,password,name) VALUES ('migration@example.com','hash','Nome') RETURNING id")
+        cursor.execute("INSERT INTO users (login,password,name) VALUES ('migration_example_com','hash','Nome') RETURNING id")
         user_id = cursor.fetchone()[0]
         cursor.execute("INSERT INTO userlibrary (user_id,content_id,name) VALUES (%s,'mongo','Duna')", (user_id,))
     connection.commit()

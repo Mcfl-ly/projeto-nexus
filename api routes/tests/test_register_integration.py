@@ -8,7 +8,7 @@ from argon2 import PasswordHasher
 @pytest.mark.integration
 def test_cadastro_valido_persiste_no_postgresql(integration_client, postgres_database):
     dados = {
-        "email": "integracao@example.com",
+        "login": "integracao_example_com",
         "password": "SenhaIntegracao123!",
         "name": "Usuario integracao",
     }
@@ -22,13 +22,13 @@ def test_cadastro_valido_persiste_no_postgresql(integration_client, postgres_dat
     try:
         with verification.cursor() as cursor:
             cursor.execute(
-                "SELECT email, password, name, created_at FROM users WHERE email = %s",
-                (dados["email"],),
+                "SELECT login, password, name, created_at FROM users WHERE login = %s",
+                (dados["login"],),
             )
             registros = cursor.fetchall()
         assert len(registros) == 1
-        email, senha_hash, nome, data = registros[0]
-        assert email == dados["email"]
+        login, senha_hash, nome, data = registros[0]
+        assert login == dados["login"]
         assert nome == dados["name"]
         assert data == datetime.date.today()
         assert senha_hash != dados["password"]

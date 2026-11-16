@@ -1,9 +1,10 @@
+import { apiUrl } from "../api.js";
 import FavoriteButton from "../Components/FavoriteButton.jsx";
 import AddContentModal from "../Components/AddContentModal.jsx";
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import "./Movies.css";
-import Header from "../components/Header.jsx";
+import Header from "../Components/Header.jsx";
 import useLibrary from "../hooks/useLibrary";
 
 export default function Movies() {
@@ -53,7 +54,7 @@ export default function Movies() {
 
         try {
             const response = await fetch(
-                `http://localhost:8000/library/${id}`,
+                apiUrl(`/library/${id}`),
                 {
                     method: "PATCH",
                     credentials: "include",
@@ -104,7 +105,7 @@ export default function Movies() {
 
         try {
             const response = await fetch(
-                `http://localhost:8000/library/${registroId}`,
+                apiUrl(`/library/${registroId}`),
                 {
                     method: "DELETE",
                     credentials: "include",

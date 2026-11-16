@@ -1,3 +1,4 @@
+import { apiUrl } from "../api.js";
 import { useCallback, useEffect, useState } from "react";
 
 export default function useLibrary(userId) {
@@ -25,7 +26,7 @@ export default function useLibrary(userId) {
             setLoadingLibrary(true);
 
             try {
-                const response = await fetch("http://localhost:8000/library", {
+                const response = await fetch(apiUrl("/library"), {
                     method: "GET",
                     credentials: "include",
                     signal,
@@ -45,7 +46,7 @@ export default function useLibrary(userId) {
                 // Uma biblioteca vazia não precisa da segunda requisição.
                 if (ids.length > 0) {
                     const mongoResponse = await fetch(
-                        "http://localhost:8000/get_mongo",
+                        apiUrl("/get_mongo"),
                         {
                             method: "POST",
                             credentials: "include",

@@ -1,4 +1,5 @@
-from typing import Literal
+from database import RequestConnection
+from typing import Annotated, Literal
 import json
 from routers.db_errors import handle_database_errors
 from deep_translator import GoogleTranslator
@@ -11,7 +12,7 @@ import jwt
 from pymongo import MongoClient
 import unicodedata
 import requests
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictBool
 from bson import ObjectId
 from fastapi.encoders import jsonable_encoder
 
@@ -63,13 +64,7 @@ IGDB_TOKEN = None
 secret_key = os.getenv("SECRET_KEY")
 algorithm = os.getenv("ALGORITHM")
 
-connection = psycopg2.connect(
-    dbname=os.getenv("DBNAME"),
-    host=os.getenv("HOST"),
-    port=os.getenv("PORT"),
-    user=os.getenv("USER"),
-    password=os.getenv("PASSWORD"),
-)
+connection = RequestConnection()
 
 cursor = connection.cursor()
 
@@ -78,6 +73,14 @@ router = APIRouter(tags=["Libr"])
 class ContentRequest(BaseModel):
     title: str = Field(min_length=1, max_length=500)
     type: Literal["movie", "game", "book"]
+
+class CatalogRequest(BaseModel):
+    ids: list[Annotated[str, Field(pattern=r"^[a-fA-F0-9]{24}$")]]
+
+
+class FavoriteUpdate(BaseModel):
+    favorite: StrictBool
+
 
 class LibraryUpdate(BaseModel):
     status: str | None = None
@@ -414,7 +417,7 @@ def add_manual_book_to_library(dados, user):
 @handle_database_errors(lambda: connection)
 async def get_library(user_id: str = Depends(get_current_user)):
 
-    sql = "select * from userlibrary where user_id = %s"
+    sql = "SELECT id, user_id, content_id, name, status, rating, created_at, external_api_id, content_type, favorite FROM userlibrary WHERE user_id = %s"
 
     cursor.execute(sql, (user_id,))
 
@@ -511,22 +514,42 @@ async def add_manual_content(dados: ManualContent, user = Depends(get_current_us
 
 @router.post("/get_mongo")
 @handle_database_errors(lambda: connection)
-async def get_mongo_library(ids: dict = Body(...), user = Depends(get_current_user)):
+async def get_mongo_library(ids: CatalogRequest, user = Depends(get_current_user)):
+    if not ids.ids:
+        return []
+    cursor.execute("SELECT content_id FROM userlibrary WHERE user_id = %s", (user,))
+    owned = {str(row[0]).lower() for row in cursor.fetchall()}
+    if any(value.lower() not in owned for value in ids.ids):
+        raise HTTPException(status_code=404, detail="Conteúdo não encontrado.")
     content = []
     client = MongoClient(connection_string, serverSelectionTimeoutMS=5000)
     try:
         db = client[os.getenv("DATABASE")]
         collection = db[os.getenv("COLECAO")]
 
-        for i in ids["ids"]:
+        for i in ids.ids:
             result = collection.find_one({"_id": ObjectId(i)})
 
             content.append(result)
 
-        print(content)
         return jsonable_encoder(content, custom_encoder={ObjectId: str})
     finally:
         client.close()
 
     # for i in ids["ids"]:
     #     print(i)
+
+
+@router.patch("/library/{id}/favorite")
+@handle_database_errors(lambda: connection)
+async def update_favorite(id: int, data: FavoriteUpdate, user_id: str = Depends(get_current_user)):
+    cursor.execute(
+        "UPDATE userlibrary SET favorite = %s WHERE user_id = %s AND id = %s RETURNING favorite",
+        (data.favorite, user_id, id),
+    )
+    result = cursor.fetchone()
+    if result is None:
+        connection.rollback()
+        raise HTTPException(status_code=404, detail="Conteúdo não encontrado.")
+    connection.commit()
+    return {"favorite": result[0]}

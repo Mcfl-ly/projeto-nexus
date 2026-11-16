@@ -1,7 +1,10 @@
+from settings import COOKIE_SECURE, COOKIE_SAMESITE
+from database import RequestConnection
 from uuid import uuid4
 from routers.db_errors import handle_database_errors
 from fastapi import FastAPI, HTTPException, status, Response, Request, APIRouter
-from pydantic import BaseModel, EmailStr, ValidationError, Field
+from typing import Annotated
+from pydantic import BaseModel, StringConstraints, ValidationError, Field
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError, InvalidHashError
 import psycopg2
@@ -16,13 +19,7 @@ dotenv.load_dotenv()
 secret_key = os.getenv("SECRET_KEY")
 algorithm = os.getenv("ALGORITHM")
 
-connection = psycopg2.connect(
-    dbname=os.getenv("DBNAME"),
-    host=os.getenv("HOST"),
-    port=os.getenv("PORT"),
-    user=os.getenv("USER"),
-    password=os.getenv("PASSWORD"),
-)
+connection = RequestConnection()
 
 cursor = connection.cursor()
 
@@ -66,12 +63,12 @@ def create_refresh_token(user_id):
 
 # ---CLASSES----
 class Register(BaseModel):
-    email: EmailStr
+    login: Annotated[str, StringConstraints(strip_whitespace=True, to_lower=True, min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_.-]+$")]
     password: str = Field(min_length=8, max_length=64)
     name: str = Field(min_length=1, max_length=100)
 
 class Login(BaseModel):
-    email: EmailStr
+    login: Annotated[str, StringConstraints(strip_whitespace=True, to_lower=True, min_length=3, max_length=50, pattern=r"^\S+$")]
     password: str = Field(min_length=8, max_length=64)
 
 
@@ -80,8 +77,8 @@ class Login(BaseModel):
 @handle_database_errors(lambda: connection)
 async def register(dados: Register):
     hashed = pswdHasher.hash(dados.password)
-    sql = "INSERT INTO users (email, password, name, created_at) VALUES (%s, %s, %s, %s)"
-    cursor.execute(sql, (dados.email, hashed, dados.name, datetime.date.today()))
+    sql = "INSERT INTO users (login, password, name, created_at) VALUES (%s, %s, %s, %s)"
+    cursor.execute(sql, (dados.login, hashed, dados.name, datetime.date.today()))
     connection.commit()
 
 
@@ -90,12 +87,12 @@ async def register(dados: Register):
 async def login(dados: Login, response: Response):
     token_sql = "INSERT INTO refreshtoken (user_id, token, expires_at, revoked, created_at) VALUES (%s, %s, %s, %s, %s)"
 
-    sql = "SELECT * FROM users WHERE email = %s"
-    cursor.execute(sql, (dados.email,))
+    sql = "SELECT * FROM users WHERE lower(login) = %s"
+    cursor.execute(sql, (dados.login,))
     result = cursor.fetchone()
     erro_autenticacao = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="E-mail ou senha incorretos.",
+        detail="Login ou senha incorretos.",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
@@ -117,8 +114,8 @@ async def login(dados: Login, response: Response):
             key="access_token",
             value=access_token,
             httponly=True,
-            secure=False,
-            samesite="lax",
+            secure=COOKIE_SECURE,
+            samesite=COOKIE_SAMESITE,
             max_age=60 * 15
         )
 
@@ -126,8 +123,8 @@ async def login(dados: Login, response: Response):
             key="refresh_token",
             value=refresh_token,
             httponly=True,
-            secure=False,
-            samesite="lax",
+            secure=COOKIE_SECURE,
+            samesite=COOKIE_SAMESITE,
             max_age=60 * 60 * 24 * 30
         )
         return {
@@ -161,14 +158,14 @@ async def logout(response: Response, request: Request):
     response.delete_cookie(
         key="refresh_token",
         httponly=True,
-        secure=True,
-        samesite="lax"
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE
     )
     response.delete_cookie(
         key="access_token",
         httponly=True,
-        secure=True,
-        samesite="lax"
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE
     )
     return {"message": "Logout realizado com sucesso."}
 
@@ -212,16 +209,16 @@ async def refresh(response: Response, request: Request):
                     key="access_token",
                     value=new_access_token,
                     httponly=True,
-                    secure=False,
-                    samesite="lax",
+                    secure=COOKIE_SECURE,
+                    samesite=COOKIE_SAMESITE,
                     max_age=60 * 15
                 )
                 response.set_cookie(
                     key="refresh_token",
                     value=new_refresh_token,
                     httponly=True,
-                    secure=False,
-                    samesite="lax",
+                    secure=COOKIE_SECURE,
+                    samesite=COOKIE_SAMESITE,
                     max_age=60 * 60 * 24 * 30
                 )
                 return {"message": "Access token renovado"}

@@ -5,7 +5,7 @@ from argon2 import PasswordHasher
 
 def test_cadastro_valido_insere_usuario_e_confirma_transacao(client, mock_db):
     dados = {
-        "email": "cadastro@example.com",
+        "login": "cadastro_example_com",
         "password": "SenhaValida123!",
         "name": "Usuario teste",
     }
@@ -17,8 +17,8 @@ def test_cadastro_valido_insere_usuario_e_confirma_transacao(client, mock_db):
     cursor.execute.assert_called_once()
     consulta, parametros = cursor.execute.call_args.args
     assert "INSERT INTO users" in consulta
-    email, senha_hash, nome, data = parametros
-    assert email == dados["email"]
+    login, senha_hash, nome, data = parametros
+    assert login == dados["login"]
     assert nome == dados["name"]
     assert data == datetime.date.today()
     assert senha_hash != dados["password"]

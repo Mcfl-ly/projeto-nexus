@@ -1,3 +1,5 @@
+from contextlib import nullcontext
+from database import RequestConnection, request_scope
 from functools import wraps
 
 import psycopg2
@@ -11,7 +13,9 @@ def handle_database_errors(get_connection):
         @wraps(handler)
         async def wrapped(*args, **kwargs):
             try:
-                return await handler(*args, **kwargs)
+                scope = request_scope() if isinstance(get_connection(), RequestConnection) else nullcontext()
+                with scope:
+                    return await handler(*args, **kwargs)
             except (psycopg2.Error, PyMongoError) as error:
                 try:
                     get_connection().rollback()

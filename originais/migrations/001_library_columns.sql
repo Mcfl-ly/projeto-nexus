@@ -1,0 +1,4 @@
+BEGIN;
+ALTER TABLE userlibrary ADD COLUMN IF NOT EXISTS external_api_id TEXT;
+ALTER TABLE userlibrary ADD COLUMN IF NOT EXISTS content_type VARCHAR(10);
+COMMIT;

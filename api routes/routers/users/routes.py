@@ -1,3 +1,4 @@
+from database import RequestConnection
 from routers.db_errors import handle_database_errors
 from fastapi import FastAPI, HTTPException, status, Response, Request, APIRouter, Depends
 import psycopg2
@@ -26,13 +27,7 @@ class UserUpdate(BaseModel):
 class PasswordUpdate(BaseModel):
     password: str = Field(min_length=8, max_length=64)
 
-connection = psycopg2.connect(
-    dbname=os.getenv("DBNAME"),
-    host=os.getenv("HOST"),
-    port=os.getenv("PORT"),
-    user=os.getenv("USER"),
-    password=os.getenv("PASSWORD"),
-)
+connection = RequestConnection()
 
 cursor = connection.cursor()
 
@@ -107,7 +102,7 @@ async def users_me(current_user = Depends(get_current_user)):
         )
     returned_user = {
         "id" : user[0],
-        "email": user[1],
+        "login": user[1],
         "username": user[3],
         "created_at": user[4],
         "content": final_content,

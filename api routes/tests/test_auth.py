@@ -22,7 +22,7 @@ def test_cadastro_rejeita_senha_curta(client):
     resposta = client.post(
         "/register",
         json={
-            "email": "teste@example.com",
+            "login": "teste_example_com",
             "password": "123",
             "name": "Usuario teste",
         },
@@ -33,11 +33,11 @@ def test_cadastro_rejeita_senha_curta(client):
     assert any(erro["loc"] == ["body", "password"] for erro in erros)
 
 
-def test_cadastro_rejeita_email_invalido(client):
+def test_cadastro_rejeita_login_invalido(client):
     resposta = client.post(
         "/register",
         json={
-            "email": "email-invalido",
+            "login": "login com espaço",
             "password": "senha12345",
             "name": "Usuario teste",
         },
@@ -45,4 +45,4 @@ def test_cadastro_rejeita_email_invalido(client):
 
     assert resposta.status_code == 422
     erros = resposta.json()["detail"]
-    assert any(erro["loc"] == ["body", "email"] for erro in erros)
+    assert any(erro["loc"] == ["body", "login"] for erro in erros)

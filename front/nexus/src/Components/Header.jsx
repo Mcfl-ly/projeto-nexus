@@ -1,3 +1,4 @@
+import { apiUrl } from "../api.js";
 import "../home_page/Home.css"
 import claquete from "../assets/claquete-roxa.png";
 import controle from "../assets/controle-azul.png";
@@ -16,7 +17,7 @@ export default function Header({ username }) {
 
         async function checkSession() {
             try {
-                const response = await fetch("http://localhost:8000/users/me", {
+                const response = await fetch(apiUrl("/users/me"), {
                     credentials: "include",
                     signal: controller.signal,
                 });

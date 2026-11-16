@@ -1,3 +1,4 @@
+import { apiUrl } from "../api.js";
 import { useState } from "react";
 import "./Login.css";
 import { Link, useNavigate } from "react-router-dom";
@@ -16,7 +17,7 @@ export default function Login() {
         setMessage("");
         setIsSubmitting(true);
         try {
-            const response = await fetch("http://localhost:8000/login", {
+            const response = await fetch(apiUrl("/login"), {
                 method: "POST", credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ login: login.trim(), password }),

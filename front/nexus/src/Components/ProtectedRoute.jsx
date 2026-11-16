@@ -1,3 +1,4 @@
+import { apiUrl } from "../api.js";
 import { useEffect, useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 
@@ -10,7 +11,7 @@ export default function ProtectedRoute() {
 
         async function checkSession() {
             try {
-                const response = await fetch("http://localhost:8000/users/me", {
+                const response = await fetch(apiUrl("/users/me"), {
 
                     credentials: "include",
                     signal: controller.signal,

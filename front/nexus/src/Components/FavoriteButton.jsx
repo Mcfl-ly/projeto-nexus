@@ -1,3 +1,4 @@
+import { apiUrl } from "../api.js";
 import { useState } from "react";
 import "./FavoriteButton.css";
 
@@ -12,7 +13,7 @@ export default function FavoriteButton({ id, title, favorite, onChanged }) {
         setSaving(true);
         setError("");
         try {
-            const response = await fetch("http://localhost:8000/library/" + id + "/favorite", {
+            const response = await fetch(apiUrl("/library/") + id + "/favorite", {
                 method: "PATCH", credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ favorite: !active }),

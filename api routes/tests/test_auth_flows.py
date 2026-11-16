@@ -7,10 +7,10 @@ import pytest
 from argon2 import PasswordHasher
 
 
-DATA = {"email": "user@example.com", "password": "SenhaValida123!", "name": "Teste"}
+DATA = {"login": "user_example_com", "password": "SenhaValida123!", "name": "Teste"}
 
 
-@pytest.mark.parametrize("missing", ["email", "password", "name"])
+@pytest.mark.parametrize("missing", ["login", "password", "name"])
 def test_register_required_fields(api, missing):
     data = {k: v for k, v in DATA.items() if k != missing}
     assert api.client.post("/register", json=data).status_code == 422
@@ -22,8 +22,8 @@ def test_register_password_too_long(api):
     api.db.auth.commit.assert_not_called()
 
 
-def test_register_duplicate_email_returns_conflict(api):
-    api.db.auth.cursor.return_value.execute.side_effect = psycopg2.errors.UniqueViolation("duplicate test email")
+def test_register_duplicate_login_returns_conflict(api):
+    api.db.auth.cursor.return_value.execute.side_effect = psycopg2.errors.UniqueViolation("duplicate test login")
     assert api.client.post("/register", json=DATA).status_code == 409
     api.db.auth.rollback.assert_called_once()
     api.db.auth.commit.assert_not_called()
@@ -40,7 +40,7 @@ def test_register_database_failure_rolls_back(api):
 @pytest.fixture
 def existing_user(api):
     hashed = PasswordHasher().hash(DATA["password"])
-    api.db.auth.cursor.return_value.fetchone.return_value = (1, DATA["email"], hashed, "Teste", datetime.date.today())
+    api.db.auth.cursor.return_value.fetchone.return_value = (1, DATA["login"], hashed, "Teste", datetime.date.today())
     return api
 
 
@@ -57,7 +57,8 @@ def test_login_success_tokens_and_secure_cookies(existing_user):
         remaining = payload["exp"] - datetime.datetime.now(datetime.timezone.utc).timestamp()
         assert max_age - 10 < remaining <= max_age
         cookie = next(h.lower() for h in response.headers.get_list("set-cookie") if h.startswith(name + "="))
-        assert all(flag in cookie for flag in ["httponly", "secure", "samesite=lax", f"max-age={max_age}"])
+        assert ("; secure" in cookie) == api.modules.auth.COOKIE_SECURE
+        assert all(flag in cookie for flag in ["httponly", "samesite=lax", f"max-age={max_age}"])
     params = api.db.auth.cursor.return_value.execute.call_args.args[1]
     assert params[0] == 1
     assert PasswordHasher().verify(params[1], response.cookies["refresh_token"])
@@ -67,17 +68,17 @@ def test_login_success_tokens_and_secure_cookies(existing_user):
 @pytest.mark.parametrize("known_user", [True, False])
 def test_login_invalid_credentials(api, known_user):
     api.db.auth.cursor.return_value.fetchone.return_value = (
-        (1, DATA["email"], PasswordHasher().hash("OutraSenha123!"), "Teste", datetime.date.today())
+        (1, DATA["login"], PasswordHasher().hash("OutraSenha123!"), "Teste", datetime.date.today())
         if known_user else None
     )
     response = api.client.post("/login", json=DATA)
     assert response.status_code == 401
-    assert response.json()["detail"] == "E-mail ou senha incorretos."
+    assert response.json()["detail"] == "Login ou senha incorretos."
     assert "set-cookie" not in response.headers
     api.db.auth.commit.assert_not_called()
 
 
-@pytest.mark.parametrize("data", [{}, {"email": "invalido", "password": "12345678"}, {"email": "a@example.com", "password": "1"}])
+@pytest.mark.parametrize("data", [{}, {"login": "login com espaço", "password": "12345678"}, {"login": "a_example_com", "password": "1"}])
 def test_login_invalid_input(api, data):
     assert api.client.post("/login", json=data).status_code == 422
 

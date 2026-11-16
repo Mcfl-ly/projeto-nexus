@@ -1,3 +1,4 @@
+import { apiUrl } from "../api.js";
 import { useEffect, useRef, useState } from "react";
 import "./AddContentModal.css";
 
@@ -56,7 +57,7 @@ export default function AddContentModal({ type, onClose, onAdded }) {
         }
         setSaving(true);
         try {
-            const response = await fetch(mode === "manual" ? "http://localhost:8000/library/manual" : "http://localhost:8000/library", {
+            const response = await fetch(mode === "manual" ? apiUrl("/library/manual") : apiUrl("/library"), {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },

@@ -1,6 +1,7 @@
+import { apiUrl } from "../api.js";
 import FavoriteButton from "../Components/FavoriteButton.jsx";
 import AddContentModal from "../Components/AddContentModal.jsx";
-import Header from "../components/Header.jsx";
+import Header from "../Components/Header.jsx";
 import {useOutletContext} from "react-router-dom";
 import useLibrary from "../hooks/useLibrary.js";
 import {useEffect, useState} from "react";
@@ -57,7 +58,7 @@ export default function Games() {
 
         try {
             const response = await fetch(
-                `http://localhost:8000/library/${id}`,
+                apiUrl(`/library/${id}`),
                 {
                     method: "PATCH",
                     credentials: "include",
@@ -108,7 +109,7 @@ export default function Games() {
 
         try {
             const response = await fetch(
-                `http://localhost:8000/library/${registroId}`,
+                apiUrl(`/library/${registroId}`),
                 {
                     method: "DELETE",
                     credentials: "include",

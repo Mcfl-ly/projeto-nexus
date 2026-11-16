@@ -1,6 +1,6 @@
 CREATE TABLE users (
  	id SERIAL PRIMARY KEY,
- 	email VARCHAR(50) NOT NULL UNIQUE,
+ 	login VARCHAR(50) NOT NULL UNIQUE,
  	password VARCHAR(200) NOT NULL,
  	name VARCHAR(100) NOT NULL,
  	created_at DATE
@@ -24,12 +24,17 @@ CREATE TABLE userLibrary (
 	status VARCHAR(20),
 	rating FLOAT,
 	created_at DATE,
+	external_api_id TEXT,
+	content_type VARCHAR(10),
+	favorite BOOLEAN NOT NULL DEFAULT FALSE,
 	FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 
+CREATE UNIQUE INDEX users_login_lower_unique ON users (lower(login));
+
 /*SCRIPT DE TESTE*/
-INSERT INTO users (email, password, name, created_at) VALUES
+INSERT INTO users (login, password, name, created_at) VALUES
 ('alice@email.com', 'senha_hash_123', 'Alice Silva', CURRENT_DATE),
 ('bob@email.com', 'senha_hash_456', 'Bob Souza', CURRENT_DATE);
 

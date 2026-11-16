@@ -41,6 +41,8 @@ O aviso de descontinuacao httpx/Starlette atualmente nao impede a execucao.
 - test_library_flows.py: biblioteca, validacao, permissoes e APIs simuladas.
 - test_api_integration.py: fluxos completos, persistencia e isolamento entre
   usuarios no PostgreSQL temporario.
+- test_favorites.py: marcar/desmarcar favoritos, persistencia, validacao e isolamento.
+- test_login_identifier.py: regras de login, normalizacao, contas antigas e migracao.
 - conftest.py: fixtures, simulacoes e ciclo de vida dos bancos temporarios.
 
 ## Contratos esperados e falhas
@@ -59,11 +61,17 @@ O schema de integracao vem do script do repositorio. Erros por colunas
 ausentes mostram uma divergencia entre esse script e as rotas; nao provam
 que essas colunas estejam ausentes no banco principal em uso.
 
-Ultima execucao completa: 139 casos aprovados, nenhuma falha e um aviso,
-em 15/10/2026. Os 25 casos que antes falhavam agora passam. Foram adicionados
-26 casos em test_fixes_regression.py para erros de banco, renovacao atomica,
-respostas externas, fechamento de cliente Mongo e migracao SQL idempotente.
+## Validacao recente
+
+A verificacao de preparacao para hospedagem inclui a suite completa com integracao PostgreSQL, sem excluir os testes de cookies ou perfil. Esses contratos foram alinhados: cookies seguem COOKIE_SECURE e o perfil inclui id. Os testes adicionais cobrem isolamento do catalogo MongoDB e ciclo de vida das conexoes por requisicao.
+
+```powershell
+python -m pytest tests -q --run-integration
+```
+
+O container ainda precisa ser construido e validado no Render ou em uma maquina com Docker.
 
 A migracao originais/migrations/001_library_columns.sql atende bancos antigos
 sem external_api_id e content_type. No banco configurado no Nexus, ambas as
 colunas ja existiam, portanto a migracao nao foi aplicada ali.
+

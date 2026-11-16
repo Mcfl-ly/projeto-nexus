@@ -7,7 +7,7 @@ import Games from './games_page/Games.jsx'
 import Books from './books_page/Books.jsx'
 import Login from "./login_page/Login.jsx";
 import Register from "./register_page/Register.jsx"
-import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import ProtectedRoute from "./Components/ProtectedRoute.jsx";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 createRoot(document.getElementById('root')).render(
