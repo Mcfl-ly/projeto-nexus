@@ -273,10 +273,10 @@ MongoDB e os serviços externos são simulados na suíte. Portanto, esses testes
 
 ## Próximas etapas
 
-- [ ] Concluir a integração das páginas React com a biblioteca e os metadados do catálogo.
-- [ ] Substituir os dados de exemplo do dashboard por dados reais.
-- [ ] Completar os fluxos da interface para busca, cadastro manual, edição e remoção.
-- [ ] Ajustar e validar o comportamento de sessão para produção com HTTPS.
+
+
+- [ ] Opção para usuário dar uma nota para o conteúdo.
+- [ ] Opção para usuário armazenar o próprio review sobre o conteúdo.
 - [ ] Containerizar os serviços com Docker.
 - [ ] Avaliar Redis para cache.
 - [ ] Automatizar verificações com GitHub Actions.
