@@ -36,6 +36,7 @@ O aviso de descontinuacao httpx/Starlette atualmente nao impede a execucao.
 
 - test_auth.py: validacao inicial do cadastro.
 - test_register.py / test_register_integration.py: cadastro valido.
+- test_auth_session_performance.py: busca direta de sessão, compatibilidade com hashes antigos, revogação e rotação sem Argon2 nos novos tokens; pode rodar sem sockets locais.
 - test_auth_flows.py: cadastro, login, cookies, logout, refresh e erros.
 - test_users_flows.py: autenticacao, perfil, nome, senha e exclusao.
 - test_library_flows.py: biblioteca, validacao, permissoes e APIs simuladas.

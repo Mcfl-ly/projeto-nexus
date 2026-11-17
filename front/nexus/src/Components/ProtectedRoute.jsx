@@ -1,13 +1,16 @@
+import { peekLogin, clearLogin } from "../authSession.js";
 import LibraryProvider from "./LibraryProvider.jsx";
 import { apiUrl } from "../api.js";
 import { useEffect, useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 
 export default function ProtectedRoute() {
-    const [user, setUser] = useState(null);
-    const [status, setStatus] = useState("loading");
+    const [initialUser] = useState(peekLogin);
+    const [user, setUser] = useState(initialUser);
+    const [status, setStatus] = useState(initialUser ? "authenticated" : "loading");
 
     useEffect(() => {
+        if (initialUser) { clearLogin(); return; }
         const controller = new AbortController();
 
         async function checkSession() {
@@ -44,7 +47,7 @@ export default function ProtectedRoute() {
         checkSession();
 
         return () => controller.abort();
-    }, []);
+    }, [initialUser]);
 
     if (status === "loading") {
         return <p>Verificando sua sessão...</p>;

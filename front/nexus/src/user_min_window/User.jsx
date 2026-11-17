@@ -1,9 +1,12 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { apiUrl } from "../api.js";
 import { useEffect, useRef, useState } from "react";
 import "./User.css";
 
 export default function User({ usuario }) {
+    const navigate = useNavigate();
+    const [saindo, setSaindo] = useState(false);
+    const [erroSaida, setErroSaida] = useState("");
     const [aberto, setAberto] = useState(false);
     const perfilRef = useRef(null);
     const botaoRef = useRef(null);
@@ -34,6 +37,9 @@ export default function User({ usuario }) {
     }, [aberto]);
 
     async function logout() {
+        if (saindo) return;
+        setSaindo(true);
+        setErroSaida("");
         try {
             const response = await fetch(apiUrl("/logout"), {
                 method: "POST",
@@ -45,10 +51,12 @@ export default function User({ usuario }) {
             }
 
             setAberto(false);
-            window.location.assign("/login");
-        }   catch (erro) {
-        console.error("Erro no logout:", erro);
-    }}
+            navigate("/login", { replace: true });
+        } catch {
+            setErroSaida("Não foi possível sair. Tente novamente.");
+            setSaindo(false);
+        }
+    }
 
 
     return (
@@ -70,7 +78,8 @@ export default function User({ usuario }) {
                     <p>Olá, bem-vindo <strong>{`${usuario}`}</strong>!</p>
                     <Link to="/perfil" onClick={() => setAberto(false)}>Meu perfil</Link>
                     {/*<a href="/configuracoes">Configurações</a>*/}
-                    <button type="button" onClick={() => logout()}>Sair</button>
+                    <button type="button" disabled={saindo} onClick={() => logout()}>{saindo ? "Saindo…" : "Sair"}</button>
+                    {erroSaida && <p role="alert">{erroSaida}</p>}
                 </div>
             )}
         </div>

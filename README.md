@@ -30,8 +30,9 @@ O projeto reúne autenticação com JWT, controle de acesso por usuário, persis
 - Entrada por login e senha, com validação de dados.
 - Hash de senhas com Argon2.
 - Access token JWT com duração de 15 minutos.
-- Refresh token JWT com duração de 30 dias, armazenado como hash no PostgreSQL.
-- Rotação de refresh tokens e revogação no logout.
+- Refresh token JWT com duração de 30 dias, armazenado como fingerprint SHA-256 no PostgreSQL. Sessões antigas em Argon2 continuam compatíveis, com busca restrita ao usuário do token assinado.
+- Rotação de refresh tokens e revogação no logout, sem verificar as sessões de todos os usuários.
+- O login retorna o perfil básico para abrir a Home sem uma consulta adicional a `/users/me`. Senhas continuam protegidas por Argon2.
 - Armazenamento dos tokens no navegador por cookies HttpOnly.
 - Consulta de perfil, alteração de nome e senha e exclusão da conta.
 

@@ -34,7 +34,7 @@ def test_register_login_profile_end_to_end(real_api):
     assert "password" not in response.json()
     rows = fetch(api, "SELECT token, revoked FROM refreshtoken")
     assert len(rows) == 1 and rows[0][1] is False
-    assert PasswordHasher().verify(rows[0][0], api.client.cookies["refresh_token"])
+    assert rows[0][0] == api.modules.auth.refresh_fingerprint(api.client.cookies["refresh_token"])
 
 
 def test_duplicate_register_does_not_poison_next_request(real_api):

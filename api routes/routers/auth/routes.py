@@ -1,6 +1,7 @@
 from settings import COOKIE_SECURE, COOKIE_SAMESITE
 from database import RequestConnection
 from uuid import uuid4
+from hashlib import sha256
 from routers.db_errors import handle_database_errors
 from fastapi import FastAPI, HTTPException, status, Response, Request, APIRouter
 from typing import Annotated
@@ -61,6 +62,40 @@ def create_refresh_token(user_id):
     )
 
 
+def refresh_fingerprint(token):
+    # Refresh tokens have a random jti; unlike passwords, they need no slow KDF.
+    return "sha256:" + sha256(token.encode("utf-8")).hexdigest()
+
+
+def find_refresh_session(token, *, allow_expired=False):
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, secret_key, algorithms=[algorithm],
+                             options={"verify_exp": not allow_expired, "require": ["exp", "sub"]})
+        if payload.get("type") != "refresh" or not str(payload.get("sub", "")).isdigit():
+            return None
+        user_id = int(payload["sub"])
+    except jwt.InvalidTokenError:
+        return None
+    cursor.execute("SELECT * FROM refreshtoken WHERE user_id = %s AND token = %s AND revoked = false",
+                   (user_id, refresh_fingerprint(token)))
+    session = cursor.fetchone()
+    if session:
+        return session
+    # Compatibility for sessions issued before fingerprints were introduced.
+    # Never run Argon2 against another user's sessions.
+    cursor.execute("SELECT * FROM refreshtoken WHERE user_id = %s AND revoked = false AND expires_at >= CURRENT_DATE AND token LIKE %s",
+                   (user_id, "$argon2%"))
+    for session in cursor.fetchall():
+        try:
+            if pswdHasher.verify(session[2], token):
+                return session
+        except (VerifyMismatchError, InvalidHashError, TypeError):
+            continue
+    return None
+
+
 # ---CLASSES----
 class Register(BaseModel):
     login: Annotated[str, StringConstraints(strip_whitespace=True, to_lower=True, min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_.-]+$")]
@@ -105,7 +140,7 @@ async def login(dados: Login, response: Response):
         refresh_token = create_refresh_token(result[0])
         created_at = datetime.date.today()
         expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)
-        hashed_token = pswdHasher.hash(refresh_token)
+        hashed_token = refresh_fingerprint(refresh_token)
 
         cursor.execute(token_sql, (result[0], hashed_token, expires_at, False, created_at))
         connection.commit()
@@ -129,7 +164,8 @@ async def login(dados: Login, response: Response):
         )
         return {
             "status": "sucesso",
-            "mensagem": "Senha correta."
+            "mensagem": "Senha correta.",
+            "user": {"id": result[0], "login": result[1], "username": result[3], "content": []}
         }
     except (VerifyMismatchError, InvalidHashError):
         raise erro_autenticacao
@@ -139,22 +175,10 @@ async def login(dados: Login, response: Response):
 @router.post("/logout")
 @handle_database_errors(lambda: connection)
 async def logout(response: Response, request: Request):
-    sql_update = "UPDATE refreshtoken SET revoked=true WHERE id = %s"
-    sql_select = "SELECT id, token FROM refreshtoken WHERE revoked = false"
-    cursor.execute(sql_select)
-    tokens = cursor.fetchall()
-    refresh_token = request.cookies.get("refresh_token")
-    if refresh_token:
-        for token in tokens:
-            try:
-                if pswdHasher.verify(token[1], refresh_token):
-                    cursor.execute(sql_update, (token[0],))
-                    connection.commit()
-                    break
-            except VerifyMismatchError:
-                continue
-            except InvalidHashError:
-                continue
+    session = find_refresh_session(request.cookies.get("refresh_token"), allow_expired=True)
+    if session:
+        cursor.execute("UPDATE refreshtoken SET revoked=true WHERE id = %s AND revoked = false", (session[0],))
+        connection.commit()
     response.delete_cookie(
         key="refresh_token",
         httponly=True,
@@ -176,52 +200,23 @@ async def refresh(response: Response, request: Request):
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
         raise HTTPException(status_code=401, detail="Refresh token inválido.")
-    sql_check = "SELECT * FROM refreshtoken WHERE revoked = false"
     sql_rotate_token = "UPDATE refreshtoken SET revoked=true WHERE id = %s"
     sql_add_new_refresh_token = "INSERT INTO refreshtoken (user_id, token, expires_at, revoked, created_at) VALUES (%s, %s, %s, %s, %s)"
-    cursor.execute(sql_check)
-    tokens = cursor.fetchall()
-    for token in tokens:
-        try:
-            valid = pswdHasher.verify(token[2], refresh_token)
-        except (VerifyMismatchError, InvalidHashError, TypeError):
-            continue
-        if valid:
-            if not datetime.date.today() >= token[3]:
-
-                created_at = datetime.datetime.now(datetime.timezone.utc)
-                expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)
-
-                new_access_token = create_access_token(token[1])
-                new_refresh_token = create_refresh_token(token[1])
-
-                hashed_new_refresh_token = pswdHasher.hash(new_refresh_token)
-
-                cursor.execute(sql_rotate_token + " AND revoked = false", (token[0],))
-                if cursor.rowcount == 0:
-                    connection.rollback()
-                    raise HTTPException(status_code=401, detail="Refresh token inválido.")
-
-                cursor.execute(sql_add_new_refresh_token, (token[1], hashed_new_refresh_token, expires_at, False, created_at))
-                connection.commit()
-
-                response.set_cookie(
-                    key="access_token",
-                    value=new_access_token,
-                    httponly=True,
-                    secure=COOKIE_SECURE,
-                    samesite=COOKIE_SAMESITE,
-                    max_age=60 * 15
-                )
-                response.set_cookie(
-                    key="refresh_token",
-                    value=new_refresh_token,
-                    httponly=True,
-                    secure=COOKIE_SECURE,
-                    samesite=COOKIE_SAMESITE,
-                    max_age=60 * 60 * 24 * 30
-                )
-                return {"message": "Access token renovado"}
-
-
+    token = find_refresh_session(refresh_token)
+    if token and token[3] and datetime.date.today() < token[3]:
+        created_at = datetime.datetime.now(datetime.timezone.utc)
+        expires_at = created_at + datetime.timedelta(days=30)
+        new_access_token = create_access_token(token[1])
+        new_refresh_token = create_refresh_token(token[1])
+        cursor.execute(sql_rotate_token + " AND revoked = false", (token[0],))
+        if cursor.rowcount == 0:
+            connection.rollback()
+            raise HTTPException(status_code=401, detail="Refresh token inválido.")
+        cursor.execute(sql_add_new_refresh_token, (token[1], refresh_fingerprint(new_refresh_token), expires_at, False, created_at))
+        connection.commit()
+        response.set_cookie(key="access_token", value=new_access_token, httponly=True,
+                            secure=COOKIE_SECURE, samesite=COOKIE_SAMESITE, max_age=60 * 15)
+        response.set_cookie(key="refresh_token", value=new_refresh_token, httponly=True,
+                            secure=COOKIE_SECURE, samesite=COOKIE_SAMESITE, max_age=60 * 60 * 24 * 30)
+        return {"message": "Access token renovado"}
     raise HTTPException(status_code=401, detail="Refresh token inválido.")

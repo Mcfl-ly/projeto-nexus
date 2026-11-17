@@ -61,7 +61,8 @@ def test_login_success_tokens_and_secure_cookies(existing_user):
         assert all(flag in cookie for flag in ["httponly", "samesite=lax", f"max-age={max_age}"])
     params = api.db.auth.cursor.return_value.execute.call_args.args[1]
     assert params[0] == 1
-    assert PasswordHasher().verify(params[1], response.cookies["refresh_token"])
+    assert params[1] == api.modules.auth.refresh_fingerprint(response.cookies["refresh_token"])
+    assert response.json()["user"] == {"id": 1, "login": DATA["login"], "username": "Teste", "content": []}
     api.db.auth.commit.assert_called_once()
 
 
@@ -84,11 +85,12 @@ def test_login_invalid_input(api, data):
 
 
 def test_logout_revokes_matching_token_and_removes_cookies(api):
-    token = "test-refresh-cookie"
+    token = api.modules.auth.create_refresh_token(1)
+    api.db.auth.cursor.return_value.fetchone.return_value = None
     api.client.cookies.set("refresh_token", token)
     api.db.auth.cursor.return_value.fetchall.return_value = [
-        (10, PasswordHasher().hash("different-token")), (11, "bad-hash"),
-        (12, PasswordHasher().hash(token)),
+        (10, 1, PasswordHasher().hash("different-token")), (11, 1, "bad-hash"),
+        (12, 1, PasswordHasher().hash(token)),
     ]
     response = api.client.post("/logout")
     assert response.status_code == 200
@@ -108,7 +110,8 @@ def test_logout_without_cookie(api):
 
 @pytest.mark.parametrize("scenario", ["missing", "invalid", "expired", "revoked"])
 def test_refresh_rejects_invalid_session(api, scenario):
-    token = "refresh-test"
+    token = api.modules.auth.create_refresh_token(1)
+    api.db.auth.cursor.return_value.fetchone.return_value = None
     if scenario != "missing":
         api.client.cookies.set("refresh_token", token)
     rows = []
@@ -121,14 +124,16 @@ def test_refresh_rejects_invalid_session(api, scenario):
 
 
 def test_refresh_valid_rotates_token(api):
-    api.client.cookies.set("refresh_token", "old-refresh")
-    api.db.auth.cursor.return_value.fetchall.return_value = [(3, 1, PasswordHasher().hash("old-refresh"), datetime.date.today() + datetime.timedelta(days=10), False)]
+    old = api.modules.auth.create_refresh_token(1)
+    api.client.cookies.set("refresh_token", old)
+    api.db.auth.cursor.return_value.fetchone.return_value = None
+    api.db.auth.cursor.return_value.fetchall.return_value = [(3, 1, PasswordHasher().hash(old), datetime.date.today() + datetime.timedelta(days=10), False)]
     response = api.client.post("/refresh")
     assert response.status_code == 200
     calls = api.db.auth.cursor.return_value.execute.call_args_list
-    assert calls[1].args[1] == (3,)
-    assert "UPDATE refreshtoken SET revoked=true" in calls[1].args[0]
-    assert PasswordHasher().verify(calls[2].args[1][1], response.cookies["refresh_token"])
+    assert calls[2].args[1] == (3,)
+    assert "UPDATE refreshtoken SET revoked=true" in calls[2].args[0]
+    assert calls[3].args[1][1] == api.modules.auth.refresh_fingerprint(response.cookies["refresh_token"])
     api.db.auth.commit.assert_called_once()
 
 

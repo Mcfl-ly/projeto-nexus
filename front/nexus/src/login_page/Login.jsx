@@ -1,3 +1,4 @@
+import { rememberLogin } from "../authSession.js";
 import { apiUrl } from "../api.js";
 import { useState } from "react";
 import "./Login.css";
@@ -24,6 +25,7 @@ export default function Login() {
             });
             const data = await response.json().catch(() => null);
             if (!response.ok) throw new Error(typeof data?.detail === "string" ? data.detail : "Não foi possível entrar. Confira seu login e senha.");
+            rememberLogin(data?.user);
             navigate("/", { replace: true });
         } catch (error) {
             setMessage(error instanceof TypeError ? "Não foi possível conectar à API." : error.message);

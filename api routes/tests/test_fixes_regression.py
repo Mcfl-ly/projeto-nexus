@@ -20,6 +20,8 @@ from pymongo.errors import ServerSelectionTimeoutError
     ("library", "delete", "/library/1", None),
 ])
 def test_database_errors_are_recoverable(logged_api, area, method, route, body):
+    if route == "/logout":
+        logged_api.client.cookies.set("refresh_token", logged_api.modules.auth.create_refresh_token(1))
     connection = getattr(logged_api.db, area)
     connection.cursor.return_value.execute.side_effect = psycopg2.OperationalError("private database error")
     response = logged_api.client.request(method, route, json=body)
@@ -39,9 +41,10 @@ def test_login_commit_error_is_not_invalid_password(api):
 
 
 def test_refresh_losing_atomic_update_cannot_issue_session(api):
-    api.client.cookies.set("refresh_token", "old-cookie")
+    old = api.modules.auth.create_refresh_token(1)
+    api.client.cookies.set("refresh_token", old)
     cursor = api.db.auth.cursor.return_value
-    cursor.fetchall.return_value = [(3, 1, PasswordHasher().hash("old-cookie"), datetime.date.today() + datetime.timedelta(days=2), False)]
+    cursor.fetchone.return_value = (3, 1, api.modules.auth.refresh_fingerprint(old), datetime.date.today() + datetime.timedelta(days=2), False)
     cursor.rowcount = 0  # Outra transacao ja revogou a sessao.
     response = api.client.post("/refresh")
     assert response.status_code == 401
