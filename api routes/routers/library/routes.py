@@ -8,7 +8,7 @@ import datetime
 import dotenv
 import os
 import jwt
-from pymongo import MongoClient
+from catalog import open_catalog as MongoClient
 import unicodedata
 import requests
 from pydantic import BaseModel, Field, StrictBool
@@ -526,10 +526,10 @@ async def get_mongo_library(ids: CatalogRequest, user = Depends(get_current_user
         db = client[os.getenv("DATABASE")]
         collection = db[os.getenv("COLECAO")]
 
-        for i in ids.ids:
-            result = collection.find_one({"_id": ObjectId(i)})
-
-            content.append(result)
+        unique_ids = list(dict.fromkeys(str(ObjectId(value)) for value in ids.ids))
+        documents = list(collection.find({"_id": {"$in": [ObjectId(value) for value in unique_ids]}}))
+        by_id = {str(document["_id"]): document for document in documents}
+        content = [by_id.get(str(ObjectId(value))) for value in ids.ids]
 
         return jsonable_encoder(content, custom_encoder={ObjectId: str})
     finally:
@@ -552,3 +552,20 @@ async def update_favorite(id: int, data: FavoriteUpdate, user_id: str = Depends(
         raise HTTPException(status_code=404, detail="Conteúdo não encontrado.")
     connection.commit()
     return {"favorite": result[0]}
+
+
+@router.get("/library/full")
+@handle_database_errors(lambda: connection)
+async def get_full_library(user_id: str = Depends(get_current_user)):
+    cursor.execute("SELECT id, user_id, content_id, name, status, rating, created_at, external_api_id, content_type, favorite FROM userlibrary WHERE user_id = %s", (user_id,))
+    rows = cursor.fetchall()
+    ids = list(dict.fromkeys(row[2] for row in rows if ObjectId.is_valid(row[2])))
+    if not ids:
+        return {"library": rows, "contents": []}
+    client = MongoClient(connection_string, serverSelectionTimeoutMS=5000)
+    try:
+        collection = client[os.getenv("DATABASE")][os.getenv("COLECAO")]
+        contents = list(collection.find({"_id": {"$in": [ObjectId(value) for value in ids]}}))
+        return jsonable_encoder({"library": rows, "contents": contents}, custom_encoder={ObjectId: str})
+    finally:
+        client.close()

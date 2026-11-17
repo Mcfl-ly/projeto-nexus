@@ -10,7 +10,6 @@ function Home() {
 
   const {
     library,
-    reloadLibrary,
     fullContent,
     libraryError,
     loadingLibrary,
@@ -109,7 +108,7 @@ function Home() {
                           <Link to={contentRoutes[item.type] ?? "/"} aria-label={"Ver " + item.title}>
                             {(item.poster ?? item.img_url) ? <img src={item.poster ?? item.img_url} alt={"Capa de " + item.title} /> : <span className="favorite-placeholder">Sem capa</span>}
                           </Link>
-                          <FavoriteButton id={item.registroId} title={item.title} favorite={true} onChanged={reloadLibrary} />
+                          <FavoriteButton id={item.registroId} title={item.title} favorite={true} />
                         </div>
                         <h3 className="title-fav"><Link to={contentRoutes[item.type] ?? "/"}>{item.title}</Link></h3>
                         <p>{contentLabels[item.type] ?? item.type}</p>

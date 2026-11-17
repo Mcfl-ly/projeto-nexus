@@ -50,6 +50,8 @@ export default function Books() {
     const {
         library,
         reloadLibrary,
+        updateItem,
+        removeItem,
         fullContent,
         libraryError,
         loadingLibrary,
@@ -102,6 +104,7 @@ export default function Books() {
             }
 
             const dados = await response.json();
+            updateItem(id, { status: dados.status, rating: dados.rating });
 
             setStatusAtualizados((anterior) => ({
                 ...anterior,
@@ -146,6 +149,7 @@ export default function Books() {
             }
 
             // Sua rota não retorna dados; não é necessário chamar response.json().
+            removeItem(registroId);
             setIdsExcluidos((anterior) => [
                 ...anterior,
                 registroId,

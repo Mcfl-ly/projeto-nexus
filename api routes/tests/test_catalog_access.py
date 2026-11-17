@@ -16,7 +16,7 @@ def test_catalog_validates_ids(logged_api, body):
 def test_catalog_returns_only_owned_content(logged_api):
     api = logged_api
     api.db.library.cursor.return_value.fetchall.return_value = [(CONTENT_ID,)]
-    api.collection.find_one.return_value = {'_id': ObjectId(CONTENT_ID), 'title': 'Livro'}
+    api.collection.find.return_value = [{'_id': ObjectId(CONTENT_ID), 'title': 'Livro'}]
     response = api.client.post('/get_mongo', json={'ids': [CONTENT_ID]})
     assert response.status_code == 200
     assert response.json() == [{'_id': CONTENT_ID, 'title': 'Livro'}]

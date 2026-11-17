@@ -1,3 +1,4 @@
+import LibraryProvider from "./LibraryProvider.jsx";
 import { apiUrl } from "../api.js";
 import { useEffect, useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
@@ -11,7 +12,7 @@ export default function ProtectedRoute() {
 
         async function checkSession() {
             try {
-                const response = await fetch(apiUrl("/users/me"), {
+                const response = await fetch(apiUrl("/users/me?include_content=false"), {
 
                     credentials: "include",
                     signal: controller.signal,
@@ -57,5 +58,5 @@ export default function ProtectedRoute() {
         return <Navigate to="/login" replace />;
     }
 
-    return <Outlet context={{ user, setUser }}/>;
+    return <LibraryProvider key={user.id}><Outlet context={{ user, setUser }}/></LibraryProvider>;
 }

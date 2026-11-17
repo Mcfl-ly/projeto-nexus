@@ -79,15 +79,17 @@ def get_current_user(request: Request):
 
 @router.get("/users/me")
 @handle_database_errors(lambda: connection)
-async def users_me(current_user = Depends(get_current_user)):
+async def users_me(current_user = Depends(get_current_user), include_content: bool = True):
     user_sql = "SELECT * FROM users WHERE id = %s"
     content_sql = "SELECT id, user_id, content_id, name, status, rating, created_at, external_api_id, content_type FROM userlibrary WHERE user_id = %s"
     cursor.execute(user_sql, (current_user,))
     user = cursor.fetchone()
     if user is None:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
-    cursor.execute(content_sql, (current_user,))
-    content = cursor.fetchall()
+    content = []
+    if include_content:
+        cursor.execute(content_sql, (current_user,))
+        content = cursor.fetchall()
     final_content = []
     for item in content:
         final_content.append(

@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { apiUrl } from "../api.js";
 import { useEffect, useRef, useState } from "react";
 import "./User.css";
@@ -67,7 +68,7 @@ export default function User({ usuario }) {
             {aberto && (
                 <div id="perfil-janela" className="perfil-janela">
                     <p>Olá, bem-vindo <strong>{`${usuario}`}</strong>!</p>
-                    <a href="/perfil">Meu perfil</a>
+                    <Link to="/perfil" onClick={() => setAberto(false)}>Meu perfil</Link>
                     {/*<a href="/configuracoes">Configurações</a>*/}
                     <button type="button" onClick={() => logout()}>Sair</button>
                 </div>

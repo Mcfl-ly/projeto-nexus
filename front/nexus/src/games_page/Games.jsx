@@ -25,6 +25,8 @@ export default function Games() {
     const {
         library,
         reloadLibrary,
+        updateItem,
+        removeItem,
         fullContent,
         libraryError,
         loadingLibrary,
@@ -82,6 +84,7 @@ export default function Games() {
             }
 
             const dados = await response.json();
+            updateItem(id, { status: dados.status, rating: dados.rating });
 
             // Usa o status confirmado pelo backend.
             setStatusAtualizados((anterior) => ({
@@ -127,6 +130,7 @@ export default function Games() {
             }
 
 
+            removeItem(registroId);
             setIdsExcluidos((anterior) => [
                 ...anterior,
                 registroId,

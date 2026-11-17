@@ -21,6 +21,8 @@ export default function Movies() {
     const {
         library,
         reloadLibrary,
+        updateItem,
+        removeItem,
         fullContent,
         libraryError,
         loadingLibrary,
@@ -78,6 +80,7 @@ export default function Movies() {
             }
 
             const dados = await response.json();
+            updateItem(id, { status: dados.status, rating: dados.rating });
 
             // Usa o status confirmado pelo backend.
             setStatusAtualizados((anterior) => ({
@@ -123,6 +126,7 @@ export default function Movies() {
             }
 
             // Sua rota não retorna dados; não é necessário chamar response.json().
+            removeItem(registroId);
             setIdsExcluidos((anterior) => [
                 ...anterior,
                 registroId,

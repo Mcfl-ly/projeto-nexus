@@ -1,3 +1,4 @@
+from catalog import close_catalog
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
@@ -9,7 +10,12 @@ from routers.auth.routes import router as auth_router
 from routers.library.routes import router as library_router
 from routers.users.routes import router as user_router
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app):
+    yield
+    close_catalog()
+
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"])

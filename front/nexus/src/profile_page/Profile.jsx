@@ -1,5 +1,6 @@
+import useLibrary from "../hooks/useLibrary.js";
 import { apiUrl } from "../api.js";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import Header from "../Components/Header.jsx";
 import "./Profile.css";
@@ -29,25 +30,8 @@ export default function Profile() {
     const [nameMessage, setNameMessage] = useState("");
     const [passwordError, setPasswordError] = useState("");
     const [passwordMessage, setPasswordMessage] = useState("");
-    const [total, setTotal] = useState(null);
-    const [totalError, setTotalError] = useState("");
-    const [countRevision, setCountRevision] = useState(0);
-
-    useEffect(() => {
-        const controller = new AbortController();
-        async function loadTotal() {
-            try {
-                const response = await fetch(apiUrl("/library"), { credentials: "include", signal: controller.signal });
-                if (!response.ok) throw new Error("Não foi possível carregar a quantidade de conteúdos.");
-                const library = await response.json();
-                if (!controller.signal.aborted) { setTotal(library.length); setTotalError(""); }
-            } catch (error) {
-                if (!controller.signal.aborted) setTotalError(error.message);
-            }
-        }
-        loadTotal();
-        return () => controller.abort();
-    }, [countRevision]);
+    const { library, libraryError: totalError, loadingLibrary, reloadLibrary } = useLibrary();
+    const total = loadingLibrary ? null : library.length;
 
     async function saveName(event) {
         event.preventDefault();
@@ -90,7 +74,7 @@ export default function Profile() {
                 <div className="profile-avatar" aria-hidden="true">{savedName.trim().charAt(0).toLocaleUpperCase() || "👤"}</div>
                 <div className="profile-welcome"><h2>{savedName}</h2><p>Sua biblioteca, do seu jeito.</p></div>
                 <div className="profile-total"><h3 id="profile-library-title">Conteúdos adicionados</h3>
-                    {totalError ? <><p role="alert">{totalError}</p><button type="button" onClick={() => setCountRevision((value) => value + 1)}>Tentar novamente</button></> : <><strong>{total === null ? "…" : total}</strong><p>Filmes, jogos e livros no total</p></>}
+                    {totalError ? <><p role="alert">{totalError}</p><button type="button" onClick={reloadLibrary}>Tentar novamente</button></> : <><strong>{total === null ? "…" : total}</strong><p>Filmes, jogos e livros no total</p></>}
                 </div>
             </section>
             <div className="profile-forms">

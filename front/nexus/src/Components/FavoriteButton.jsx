@@ -1,12 +1,13 @@
+import useLibrary from "../hooks/useLibrary.js";
 import { apiUrl } from "../api.js";
 import { useState } from "react";
 import "./FavoriteButton.css";
 
 export default function FavoriteButton({ id, title, favorite, onChanged }) {
-    const [saved, setSaved] = useState(null);
+    const { updateItem } = useLibrary();
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
-    const active = saved ?? Boolean(favorite);
+    const active = Boolean(favorite);
 
     async function toggle() {
         if (saving) return;
@@ -20,7 +21,7 @@ export default function FavoriteButton({ id, title, favorite, onChanged }) {
             });
             const data = await response.json().catch(() => null);
             if (!response.ok) throw new Error(typeof data?.detail === "string" ? data.detail : "Não foi possível salvar o favorito.");
-            setSaved(data.favorite);
+            updateItem(id, { favorite: data.favorite });
             onChanged?.();
         } catch (failure) {
             setError(failure instanceof TypeError ? "Não foi possível conectar à API." : failure.message);
